@@ -12,6 +12,6 @@ set(CMAKE_BUILD_TYPE Debug)
 
 include_directories(include)
 
-file(GLOB SRC_LIST "src/*.cpp")
+file(GLOB SRC_LIST "src/UDP_Server.cpp")
 
 add_executable(WebServer ${SRC_LIST})
