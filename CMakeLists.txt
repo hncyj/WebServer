@@ -18,8 +18,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build)
 # 链接必要的库
 # target_link_libraries(WebServer <libraries>)
 
-# # 启用测试
-# enable_testing()
+# 启用测试
+enable_testing()
 
-# # 添加测试子目录
-# add_subdirectory(test)
+# 添加测试子目录
+add_subdirectory(test)
