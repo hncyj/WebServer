@@ -13,14 +13,14 @@
 template <typename T>
 class BlockQueue {
 private:
-    std::mutex _queue_mutex;
-    std::condition_variable _queue_condition_var;
+    std::mutex m_queue_mutex;
+    std::condition_variable m_queue_condition_var;
 
-    std::vector<T> _queue_array;
-    int _queue_size;
-    int _queue_max_size;
-    int _queue_first;
-    int _queue_last;
+    std::vector<T> m_queue_array;
+    int m_queue_size;
+    int m_queue_max_size;
+    int m_queue_first;
+    int m_queue_last;
 
 public:
     explicit BlockQueue(int max_size = 1000);
@@ -46,11 +46,11 @@ public:
 template <typename T>
 BlockQueue<T>::BlockQueue(int max_size) {
     if (max_size <= 0) exit(-1);
-    _queue_max_size = max_size;
-    _queue_array.resize(max_size);
-    _queue_size = 0;
-    _queue_first = -1;
-    _queue_last = -1;
+    m_queue_max_size = max_size;
+    m_queue_array.resize(max_size);
+    m_queue_size = 0;
+    m_queue_first = -1;
+    m_queue_last = -1;
 }
 
 template <typename T>
@@ -58,89 +58,89 @@ BlockQueue<T>::~BlockQueue() = default;
 
 template <typename T>
 void BlockQueue<T>::clear() {
-    std::lock_guard<std::mutex> lock(_queue_mutex);
-    _queue_size = 0;
-    _queue_first = -1;
-    _queue_last = -1;
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    m_queue_size = 0;
+    m_queue_first = -1;
+    m_queue_last = -1;
 }
 
 template <typename T>
 bool BlockQueue<T>::isFull() const {
-    std::lock_guard<std::mutex> lock(_queue_mutex);
-    return _queue_size >= _queue_max_size;
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    return m_queue_size >= m_queue_max_size;
 }
 
 template <typename T>
 bool BlockQueue<T>::isEmpty() const {
-    std::lock_guard<std::mutex> lock(_queue_mutex);
-    return _queue_size == 0;
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    return m_queue_size == 0;
 }
 
 template <typename T>
 bool BlockQueue<T>::get_first_element(T& value) const {
-    std::lock_guard<std::mutex> lock(_queue_mutex);
-    if (_queue_size == 0) return false;
-    value = _queue_array[_queue_first];
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    if (m_queue_size == 0) return false;
+    value = m_queue_array[m_queue_first];
     return true;
 }
 
 template <typename T>
 bool BlockQueue<T>::get_last_element(T& value) const {
-    std::lock_guard<std::mutex> lock(_queue_mutex);
-    if (_queue_size == 0) return false;
-    value = _queue_array[_queue_last];
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    if (m_queue_size == 0) return false;
+    value = m_queue_array[m_queue_last];
     return true;
 }
 
 template <typename T>
 int BlockQueue<T>::get_size() const {
-    std::lock_guard<std::mutex> lock(_queue_mutex);
-    return _queue_size;
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    return m_queue_size;
 }
 
 template <typename T>
 int BlockQueue<T>::get_max_size() const {
-    std::lock_guard<std::mutex> lock(_queue_mutex);
-    return _queue_max_size;
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    return m_queue_max_size;
 }
 
 template <typename T>
 bool BlockQueue<T>::push(const T& element) {
-    std::lock_guard<std::mutex> lock(_queue_mutex);
-    if (_queue_size >= _queue_max_size) {
-        _queue_condition_var.notify_all();
+    std::lock_guard<std::mutex> lock(m_queue_mutex);
+    if (m_queue_size >= m_queue_max_size) {
+        m_queue_condition_var.notify_all();
         return false;
     }
 
-    _queue_last = (_queue_last + 1) % _queue_max_size;
-    _queue_array[_queue_last] = element;
-    ++_queue_size;
-    _queue_condition_var.notify_all();
+    m_queue_last = (m_queue_last + 1) % m_queue_max_size;
+    m_queue_array[m_queue_last] = element;
+    ++m_queue_size;
+    m_queue_condition_var.notify_all();
 
     return true;
 }
 
 template <typename T>
 bool BlockQueue<T>::pop(T& element) {
-    std::unique_lock<std::mutex> lock(_queue_mutex);
-    _queue_condition_var.wait(lock, [this]{return _queue_size > 0;});
-    element = _queue_array[_queue_first];
-    _queue_first = (_queue_first + 1) % _queue_max_size;
-    --_queue_size;
+    std::unique_lock<std::mutex> lock(m_queue_mutex);
+    m_queue_condition_var.wait(lock, [this]{return m_queue_size > 0;});
+    element = m_queue_array[m_queue_first];
+    m_queue_first = (m_queue_first + 1) % m_queue_max_size;
+    --m_queue_size;
     
     return true;
 }
 
 template <typename T>
 bool BlockQueue<T>::pop(T& element, int ms_timeout) {
-    std::unique_lock<std::mutex> lock(_queue_mutex);
+    std::unique_lock<std::mutex> lock(m_queue_mutex);
     auto timeout = std::chrono::milliseconds(ms_timeout);
-    if (!_queue_condition_var.wait_for(lock, timeout, [this]{return _queue_size > 0;})) {
+    if (!m_queue_condition_var.wait_for(lock, timeout, [this]{return m_queue_size > 0;})) {
         return false;
     }
-    element = _queue_array[_queue_first];
-    _queue_first = (_queue_first + 1) % _queue_max_size;
-    --_queue_size;
+    element = m_queue_array[m_queue_first];
+    m_queue_first = (m_queue_first + 1) % m_queue_max_size;
+    --m_queue_size;
     
     return true;
 }
