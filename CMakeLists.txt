@@ -11,6 +11,8 @@ file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
 add_executable(WebServer ${SOURCES})
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build)
+
 # 链接必要的库
 # target_link_libraries(WebServer <libraries>)
 
