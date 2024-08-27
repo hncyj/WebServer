@@ -11,6 +11,7 @@ CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
 
+CMakeLists.txt
 **/CMakeLists.txt
 .vscode/
 /build/
