@@ -34,6 +34,7 @@ Reference: [TinyWebServer](https://github.com/qinguoyi/TinyWebServer/tree/master
 - **编译器**: g++ (Ubuntu 13.2.0-23ubuntu4) 13.2.0
 - **构建工具**: cmake version 3.28.3
 - **调试工具**: GNU gdb (Ubuntu 15.0.50.20240403-0ubuntu1) 15.0.50.20240403-git
+- [CMakeLists.txt](./CMakeLists.txt)
 
 ## 项目结构
 
