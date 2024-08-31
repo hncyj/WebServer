@@ -162,3 +162,8 @@ void Log::write_log(int level, const char* format, ...) {
 
     ++m_cnt_lines;
 }
+
+void Log::flush() {
+    std::lock_guard<std::mutex> lock(m_log_mutex);
+    m_log_file_stream.flush();
+}

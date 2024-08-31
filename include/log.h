@@ -45,12 +45,13 @@ public:
     static void write_log_thread_func();
     bool init(bool close_log, int max_lines = 5000, int log_buffer_size = 2048, int max_queue_size = 0);
     void write_log(int level, const char* format, ...);
+    void flush();
 };
 
 // 优化后的宏定义，避免重复调用 Log::get_instance()
 #define LOG_DEBUG(format, ...) do { \
     auto& log_instance = Log::get_instance(); \
-    if(!log_instance.m_close_log) { \
+    if(!m_open_log) { \
         log_instance.write_log(0, format, ##__VA_ARGS__); \
         log_instance.flush(); \
     } \
@@ -58,7 +59,7 @@ public:
 
 #define LOG_INFO(format, ...) do { \
     auto& log_instance = Log::get_instance(); \
-    if(!log_instance.m_close_log) { \
+    if(!m_open_log) { \
         log_instance.write_log(1, format, ##__VA_ARGS__); \
         log_instance.flush(); \
     } \
@@ -66,7 +67,7 @@ public:
 
 #define LOG_WARN(format, ...) do { \
     auto& log_instance = Log::get_instance(); \
-    if(!log_instance.m_close_log) { \
+    if(!m_open_log) { \
         log_instance.write_log(2, format, ##__VA_ARGS__); \
         log_instance.flush(); \
     } \
@@ -74,7 +75,7 @@ public:
 
 #define LOG_ERROR(format, ...) do { \
     auto& log_instance = Log::get_instance(); \
-    if(!log_instance.m_close_log) { \
+    if(!m_open_log) { \
         log_instance.write_log(3, format, ##__VA_ARGS__); \
         log_instance.flush(); \
     } \
