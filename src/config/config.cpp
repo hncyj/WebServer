@@ -1,3 +1,10 @@
+/**
+ * @file config.cpp
+ * @author chenyinjie
+ * @date 2024-09-01
+ * @brief implemention of config.h
+ */
+
 #include <unistd.h>
 #include <cstdlib>
 
@@ -13,9 +20,7 @@ Config::Config()
       SQL_CONNECT_POOL_NUMS(4),       // 默认数据库连接池数量为4
       THREAD_MODE(4),                 // 默认线程池内线程数量为4
       LOG_CLOSE(0),                   // 默认启用日志（0代表关闭）
-      ACTOR_MODE(0)                   // 默认并发模型为0（假设0代表Proactor）
-{};
-
+      ACTOR_MODE(0) {};               // 默认并发模型为0（假设0代表Proactor）
 
 void Config::parse_args(int argc, char* argv[]) {
     int opt;

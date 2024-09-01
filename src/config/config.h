@@ -1,3 +1,10 @@
+/**
+ * @file config.h
+ * @author chenyinjie
+ * @date 2024-09-01
+ * @brief 服务器启动项配置文件
+ */
+
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
@@ -22,4 +29,6 @@ public:
     int ACTOR_MODE;             // 并发模型选择，0:Proactor，1:Reactor
 };
 
+
+/** */
 #endif
