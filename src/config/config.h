@@ -2,7 +2,6 @@
  * @file config.h
  * @author chenyinjie
  * @date 2024-09-01
- * @brief 服务器启动项配置文件
  */
 
 #ifndef CONFIG_H_

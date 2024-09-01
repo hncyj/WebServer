@@ -2,7 +2,6 @@
  * @file config.cpp
  * @author chenyinjie
  * @date 2024-09-01
- * @brief implemention of config.h
  */
 
 #include <unistd.h>
