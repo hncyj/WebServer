@@ -17,7 +17,7 @@ class ConnectionPool {
 private:
     int m_max_connect_nums;                                 // 连接池最大连接数
     int m_current_connects_nums;                            // 当前连接数
-    int m_free_connects_nums;                                // 空闲连接数
+    int m_free_connects_nums;                               // 空闲连接数
     std::mutex m_connect_pool_mutex;                        // 连接池锁
     std::condition_variable m_connect_pool_condition_var;   // 连接池条件变量
     std::list<MYSQL*> m_connection_pool;                    // 连接池

@@ -7,14 +7,14 @@
 - [模块设计](#模块设计)
   - [配置管理模块](#配置管理模块)
   - [日志管理模块](#日志管理模块)
-  - [主服务器模块](#主服务器模块)
+  - [数据库连接池模块](#数据库连接池模块)
   - [线程池模块](#线程池模块)
-  - [I/O复用模块](#io复用模块)
+  - [主服务器模块](#主服务器模块)
   - [HTTP请求处理模块](#http请求处理模块)
   - [连接管理模块](#连接管理模块)
   - [异步事件通知模块](#异步事件通知模块)
   - [定时器模块](#定时器模块)
-  - [数据库模块（可选）](#数据库模块可选)
+  - [数据库模块](#数据库模块)
 - [测试与优化](#测试与优化)
 - [部署与运行](#部署与运行)
 - [常见问题与解决方案](#常见问题与解决方案)
@@ -23,9 +23,7 @@
 ## 项目简介
 本项目是一个基于Linux的C++WebServer，旨在处理大量并发连接，并提供基本的HTTP服务。
 
-项目采用多线程+Reactor模型，充分利用多核处理器的性能。
-
-Reference: [TinyWebServer](https://github.com/qinguoyi/TinyWebServer/tree/master)。
+<!-- Reference: [TinyWebServer](https://github.com/qinguoyi/TinyWebServer/tree/master)。 -->
 
 
 
@@ -34,7 +32,7 @@ Reference: [TinyWebServer](https://github.com/qinguoyi/TinyWebServer/tree/master
 - **编译器**: g++ (Ubuntu 13.2.0-23ubuntu4) 13.2.0
 - **构建工具**: cmake version 3.28.3
 - **调试工具**: GNU gdb (Ubuntu 15.0.50.20240403-0ubuntu1) 15.0.50.20240403-git
-- [CMakeLists.txt](./CMakeLists.txt)
+<!-- - [CMakeLists.txt](./CMakeLists.txt) -->
 
 ## 项目结构
 
@@ -44,8 +42,14 @@ Reference: [TinyWebServer](https://github.com/qinguoyi/TinyWebServer/tree/master
 
 ### 同步/异步文件系统
 
-同步/异步日志系统主要涉及了两个模块，一个是日志模块，一个是阻塞队列模块。
+同步/异步日志主要涉及了两个模块，一个是日志模块，一个是阻塞队列模块。
 
 阻塞队列模块用于解决异步写入日志。
+
+单例模式设计日志模块。
+
+### 数据库连接池模块
+
+单例模式设计。
 
 
