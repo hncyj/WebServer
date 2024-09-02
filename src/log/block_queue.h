@@ -1,149 +1,162 @@
+/**
+ * @file block_queue.h
+ * @author chenyinjie
+ * @date 2024-09-02
+ */
+
 #ifndef BLOCK_QUEUE_H_
 #define BLOCK_QUEUE_H_
 
-#include <iostream>
+#include <deque>
+#include <chrono>
+#include <cassert>
 #include <mutex>
 #include <condition_variable>
-#include <vector>
-#include <chrono>
-
-// 线程安全的阻塞队列
-// 利用循环数组实现
 
 template <typename T>
-class BlockQueue {
+class BlockDeque {
 private:
-    mutable std::mutex m_queue_mutex;
-    std::condition_variable m_queue_condition_var;
-
-    std::vector<T> m_queue_array;
-    int m_queue_size;
-    int m_queue_max_size;
-    int m_queue_first;
-    int m_queue_last;
+    std::deque<T> block_deque_;
+    bool is_close_;
+    size_t deque_capacity_;
+    mutable std::mutex deque_mutex_;
+    std::condition_variable consumer_con_var_;
+    std::condition_variable producer_con_var_;
 
 public:
-    explicit BlockQueue(int max_size = 1000);
-    BlockQueue(const BlockQueue&) = delete;
-    BlockQueue& operator=(const BlockQueue&) = delete;
-    ~BlockQueue();
+    explicit BlockDeque(size_t max_capacity = 1024);
+    ~BlockDeque();
 
     void clear();
-    bool isFull() const;
-    bool isEmpty() const;
-    int get_size() const;
-    int get_max_size() const;
+    void close();
+    bool isEmpty() const noexcept;
+    bool isFull() const noexcept;
+    size_t get_size() const noexcept;
+    size_t get_capacity() const noexcept;
+    T* get_front_element();
+    T* get_last_element();
 
-    bool get_first_element(T& value) const;
-    bool get_last_element(T& value) const;
-
-    bool push(const T& element);
-    bool pop(T& element);
-    bool pop(T& element, int ms_timeout);
+    void push_front(const T&);
+    void push_back(const T&);
+    bool pop(T&);
+    bool pop(T&, int);  // 超时版本
+    
+    void flush();
 };
 
 template <typename T>
-BlockQueue<T>::BlockQueue(int max_size)
-    : m_queue_max_size(max_size),
-      m_queue_array(max_size),
-      m_queue_size(0),
-      m_queue_first(0),
-      m_queue_last(-1) {
-    if (max_size <= 0) {
-        std::cerr << "Invalid max size" << std::endl;
-        exit(-1);
+BlockDeque<T>::BlockDeque(size_t max_capacity): deque_capacity_(max_capacity), is_close_(false) {
+    assert(deque_capacity_ > 0);
+}
+
+template <typename T>
+BlockDeque<T>::~BlockDeque() {
+    close();
+}
+
+template <typename T>
+void BlockDeque<T>::clear() {
+    std::lock_guard<std::mutex> lock(deque_mutex_);
+    block_deque_.clear();
+}
+
+template <typename T>
+void BlockDeque<T>::close() {
+    {
+        std::unique_lock<std::mutex> lock(deque_mutex_);
+        block_deque_.clear();
+        is_close_ = true;
     }
+    consumer_con_var_.notify_all();
+    producer_con_var_.notify_all();
 }
 
 template <typename T>
-BlockQueue<T>::~BlockQueue() = default;
-
-template <typename T>
-void BlockQueue<T>::clear() {
-    std::lock_guard<std::mutex> lock(m_queue_mutex);
-    m_queue_size = 0;
-    m_queue_first = 0;
-    m_queue_last = -1;
+bool BlockDeque<T>::isEmpty() const noexcept {
+    std::lock_guard<std::mutex> lock(deque_mutex_);
+    return block_deque_.empty();
 }
 
 template <typename T>
-bool BlockQueue<T>::isFull() const {
-    std::lock_guard<std::mutex> lock(m_queue_mutex);
-    return m_queue_size >= m_queue_max_size;
+bool BlockDeque<T>::isFull() const noexcept {
+    std::lock_guard<std::mutex> lock(deque_mutex_);
+    return block_deque_.size() >= deque_capacity_;
 }
 
 template <typename T>
-bool BlockQueue<T>::isEmpty() const {
-    std::lock_guard<std::mutex> lock(m_queue_mutex);
-    return m_queue_size == 0;
+size_t BlockDeque<T>::get_size() const noexcept {
+    std::lock_guard<std::mutex> lock(deque_mutex_);
+    return block_deque_.size();
 }
 
 template <typename T>
-int BlockQueue<T>::get_size() const {
-    std::lock_guard<std::mutex> lock(m_queue_mutex);
-    return m_queue_size;
+size_t BlockDeque<T>::get_capacity() const noexcept {
+    std::lock_guard<std::mutex> lock(deque_mutex_);
+    return deque_capacity_;
 }
 
 template <typename T>
-int BlockQueue<T>::get_max_size() const {
-    std::lock_guard<std::mutex> lock(m_queue_mutex);
-    return m_queue_max_size;
+T* BlockDeque<T>::get_front_element() {
+    std::lock_guard<std::mutex> lock(deque_mutex_);
+    if (block_deque_.empty()) return nullptr;
+    return &block_deque_.front();
 }
 
 template <typename T>
-bool BlockQueue<T>::get_first_element(T& value) const {
-    std::lock_guard<std::mutex> lock(m_queue_mutex);
-    if (m_queue_size == 0) return false;
-    value = m_queue_array[m_queue_first];
+T* BlockDeque<T>::get_last_element() {
+    std::lock_guard<std::mutex> lock(deque_mutex_);
+    if (block_deque_.empty()) return nullptr;
+    return &block_deque_.back();
+}
+
+template <typename T>
+void BlockDeque<T>::push_front(const T& element) {
+    std::unique_lock<std::mutex> lock(deque_mutex_);
+    producer_con_var_.wait(lock, [this] {return block_deque_.size() < deque_capacity_;});
+    if (is_close_) return;
+    block_deque_.push_front(element);
+    consumer_con_var_.notify_one();
+}
+
+template <typename T>
+void BlockDeque<T>::push_back(const T& element) {
+    std::unique_lock<std::mutex> lock(deque_mutex_);
+    producer_con_var_.wait(lock, [this] {return block_deque_.size() < deque_capacity_;});
+    if (is_close_) return;
+    block_deque_.push_back(element);
+    consumer_con_var_.notify_one();
+}
+
+template <typename T>
+bool BlockDeque<T>::pop(T& element) {
+    std::unique_lock<std::mutex> lock(deque_mutex_);
+    consumer_con_var_.wait(lock, [this] {return !block_deque_.empty() || is_close_;});
+    if (is_close_ && block_deque_.empty()) return false;
+    element = std::move(block_deque_.front());
+    block_deque_.pop_front();
+    producer_con_var_.notify_one();
     return true;
 }
 
 template <typename T>
-bool BlockQueue<T>::get_last_element(T& value) const {
-    std::lock_guard<std::mutex> lock(m_queue_mutex);
-    if (m_queue_size == 0) return false;
-    value = m_queue_array[m_queue_last];
-    return true;
-}
-
-template <typename T>
-bool BlockQueue<T>::push(const T& element) {
-    std::lock_guard<std::mutex> lock(m_queue_mutex);
-    if (m_queue_size >= m_queue_max_size) {
-        m_queue_condition_var.notify_all();
+bool BlockDeque<T>::pop(T& element, int timeout) {
+    std::unique_lock<std::mutex> lock(deque_mutex_);
+    if (!consumer_con_var_.wait_for(lock, std::chrono::seconds(timeout), [this] {
+        return !block_deque_.empty() || is_close_;
+    })) {
         return false;
-    }
-    m_queue_last = (m_queue_last + 1) % m_queue_max_size;
-    m_queue_array[m_queue_last] = element;
-    ++m_queue_size;
-    m_queue_condition_var.notify_all();
+    };
 
+    if (block_deque_.empty() && is_close_) return false;
+    element = std::move(block_deque_.front());
+    block_deque_.pop_front();
+    producer_con_var_.notify_one();
     return true;
 }
 
 template <typename T>
-bool BlockQueue<T>::pop(T& element) {
-    std::unique_lock<std::mutex> lock(m_queue_mutex);
-    m_queue_condition_var.wait(lock, [this]{return m_queue_size > 0;});
-    element = m_queue_array[m_queue_first];
-    m_queue_first = (m_queue_first + 1) % m_queue_max_size;
-    --m_queue_size;
-    
-    return true;
+void BlockDeque<T>::flush() {
+    consumer_con_var_.notify_all();
 }
 
-template <typename T>
-bool BlockQueue<T>::pop(T& element, int ms_timeout) {
-    std::unique_lock<std::mutex> lock(m_queue_mutex);
-    auto timeout = std::chrono::milliseconds(ms_timeout);
-    if (!m_queue_condition_var.wait_for(lock, timeout, [this]{return m_queue_size > 0;})) {
-        return false;
-    }
-    element = m_queue_array[m_queue_first];
-    m_queue_first = (m_queue_first + 1) % m_queue_max_size;
-    --m_queue_size;
-    
-    return true;
-}
-
-#endif // BLOCK_QUEUE_H_
+#endif
