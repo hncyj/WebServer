@@ -20,8 +20,6 @@ Linux环境下C++实现的轻量级WebServer。
 - mysql Ver 8.0.39-0ubuntu0.24.04.2 for Linux on x86_64
 
 ## 配置模块
-
-
 ## 缓冲区模块
 ## 日志模块
 ## http模块
