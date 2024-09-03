@@ -4,111 +4,129 @@
  * @date 2024-09-01 
  */
 
+#include <cassert>
+#include <string>
 
 #include "buffer.h"
 
-char* Buffer::beginWrite() noexcept {
-    return buffer_.data() + writePos_;
-}
+Buffer::Buffer(int init_size): buffer_(init_size), readPos_(0), writePos_(0) {}
 
-const char* Buffer::beginWrite() const noexcept {
-    return buffer_.data() + writePos_;
-}
-
-void Buffer::expand(size_t len) {
-    if (writable_bytes() + prependable_bytes() < len) {
-        buffer_.resize(writePos_ + len);
-    } else {
-        size_t rb = readable_bytes();
-        std::memmove(buffer_.data(), buffer_.data() + readPos_, rb);
-        readPos_ = 0;
-        writePos_ = rb;
-    }
-}
-
-Buffer::Buffer(size_t init_size): buffer_(init_size), readPos_(0), writePos_(0) {}
-
-size_t Buffer::writable_bytes() const noexcept {
-    return buffer_.size() - writePos_;
-}
-
-size_t Buffer::readable_bytes() const noexcept {
+size_t Buffer::readableLen() const {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
     return writePos_ - readPos_;
 }
 
-size_t Buffer::prependable_bytes() const noexcept {
-    return readPos_;
+size_t Buffer::writableLen() const {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    return buffer_.size() - writePos_;
 }
 
-const char* Buffer::read_peek() const noexcept {
-    return buffer_.data() + readPos_;
+const char* Buffer::readPtr() const {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    return bufferPtr() + readPos_;
 }
 
-void Buffer::check_writable(size_t len) {
-    if (writable_bytes() < len) {
-        expand(len);
+const char* Buffer::writePtr() const {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    return bufferPtr() + writePos_;
+}
+
+void Buffer::retrive(size_t len) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    if (len <= readableLen()) {
+        readPos_ += len;
+    } else {
+        retriveAll();
     }
-    assert(writable_bytes() >= len);
 }
 
-void Buffer::update_write_pos(size_t len) noexcept {
-    assert(writable_bytes() >= len);
-    writePos_ += len;
-}
-
-void Buffer::read_bytes(size_t len) noexcept {
-    assert(readable_bytes() >= len);
-    readPos_ += len;
-}
-
-void Buffer::clear() noexcept {
+void Buffer::retriveAll() {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
     readPos_ = 0;
     writePos_ = 0;
 }
 
-std::string Buffer::read_and_clear() {
-    std::string data(read_peek(), readable_bytes());
-    clear();
-    return data;
+std::string Buffer::retriveAll2Str() {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    std::string str(readPtr(), readableLen());
+    retriveAll();
+    return str;
 }
 
-void Buffer::append(std::string_view data) {
-    check_writable(data.size());
-    std::memcpy(beginWrite(), data.data(), data.size());
-    update_write_pos(data.size());
+void Buffer::append(const std::string& str) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    assert(!str.empty());
+    append(str.data(), str.size());
 }
 
-ssize_t Buffer::read_from_fd(int fd, int* Errno) {
-    char extra_buffer[65536];
-    // 设置缓冲区和额外缓冲区写入数组
-    iovec vec[2];
-    const size_t writableBytes = writable_bytes();
-    vec[0].iov_base = beginWrite();
-    vec[0].iov_len = writableBytes;
-    vec[1].iov_base = extra_buffer;
-    vec[1].iov_len = sizeof(extra_buffer);
+void Buffer::append(const char* data, size_t len) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    ensureWritable(len);
+    std::copy(data, data + len, writePtr());
+    writePos_ += len;
+}
 
-    const ssize_t len = ::readv(fd, vec, 2);
+void Buffer::append(const Buffer& buf) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    append(buf.readPtr(), buf.readableLen());
+}
+
+ssize_t Buffer::readFd(int fd, int* saveErrno) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    char buff[65535];
+    struct iovec iov[2];
+    const size_t write_size = writableLen();
+    iov[0].iov_base = bufferPtr() + writePos_;
+    iov[0].iov_len = write_size;
+    iov[1].iov_base = buff;
+    iov[1].iov_len = sizeof(buff);
+
+    const ssize_t len = readv(fd, iov, 2);
     if (len < 0) {
-        *Errno = errno;
-        return len;   
-    } else if (static_cast<size_t>(len) <= writableBytes) {
-        update_write_pos(len);
+        *saveErrno = errno;
+    } else if (static_cast<size_t>(len) <= write_size) {
+        writePos_ += len;
     } else {
         writePos_ = buffer_.size();
-        append(std::string_view(extra_buffer, len - writableBytes));
+        append(buff, len - write_size);
     }
-
     return len;
 }
 
-ssize_t Buffer::write_to_fd(int fd, int* Errno) {
-    const ssize_t len = ::write(fd, read_peek(), readable_bytes());
+ssize_t Buffer::writeFd(int fd, int* saveErrno) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    size_t read_size = readableLen();
+    ssize_t len = write(fd, readPtr(), read_size);
     if (len < 0) {
-        *Errno = errno;
+        *saveErrno = errno;
         return len;
     }
-    read_bytes(len);
-
+    readPos_ += len;
     return len;
+}
+
+char* Buffer::bufferPtr() {
+    return buffer_.data();
+}
+
+const char* Buffer::bufferPtr() const {
+    return buffer_.data();
+}
+
+void Buffer::expandBuffer(size_t len) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    if (writableLen() + readPos_ < len) {
+        buffer_.resize(writePos_ + len + 1);
+    } else {
+        std::copy(bufferPtr() + readPos_, bufferPtr() + writePos_, bufferPtr());
+        readPos_ = 0;
+        writePos_ = readableLen();
+    }
+}
+
+void Buffer::ensureWritable(size_t len) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    if (writableLen() < len) {
+        expandBuffer(len);
+    }
 }
