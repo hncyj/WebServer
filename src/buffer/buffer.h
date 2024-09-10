@@ -18,7 +18,7 @@
 
 class Buffer {
 public:
-    explicit Buffer(int init_size = 1024);
+    explicit Buffer(int init_size = 4096);
     ~Buffer() = default;
 
     size_t ReadableLen() const;                 // 当前可读数据长度
