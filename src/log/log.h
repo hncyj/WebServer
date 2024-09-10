@@ -1,84 +1,68 @@
+/**
+ * @file log.h
+ * @author chenyinjie
+ * @date 2024-09-02
+ */
+
 #ifndef LOG_H_
 #define LOG_H_
 
-#include <iostream>
-#include <string>
-#include <fstream>
-#include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
-#include <queue>
-#include <atomic>
-#include <condition_variable>
+#include <chrono>
+#include <memory>
+#include <fstream>
+#include <optional>
+#include <functional>
 
 #include "block_queue.h"
 
 class Log {
 private:
-    std::string m_path;                                      // 日志路径名
-    std::string m_log_name;                                  // 日志文件名
-    int m_max_lines;                                         // 日志文件最大行数
-    int m_max_buffer_size;                                   // 日志缓冲区大小
-    long long m_cnt_lines;                                   // 日志行数记录
-    int m_day;                                               // 当前日志日期
-    std::ofstream m_log_file_stream;                         // 日志文件写入流
-    std::unique_ptr<char[]> m_log_buffer_ptr;                // 日志缓冲区指针
-    std::unique_ptr<BlockQueue<std::string>> m_log_queue;    // 日志阻塞队列
-    bool m_is_sync;                                          // 是否启用异步日志写入，0禁用，1启用
-    std::mutex m_log_mutex;                                  // 日志文件锁
-    bool m_open_log;                                         // 是否关闭日志系统, 0关闭，1启用
-    
+    std::string log_path_;                                       // 日志文件存储路径            
+    std::string log_file_name_;                                  // 日志文件名
+    int max_lines_;                                              // 日志文件最大行数
+    int cnt_lines_;                                              // 日志文件当前行数
+    int today_;                                                  // 日志文件当前日期
+    bool is_open_;                                               // 是否启用日志
+    bool is_async_;                                              // 是否异步写入日志
+
+    std::fstream log_file_stream_;                               // 日志文件流
+    std::unique_ptr<BlockDeque<std::string>> log_block_deque_;   // 日志消息阻塞队列
+    mutable std::mutex log_mutex_;                               // 日志文件互斥锁
 
 private:
-    Log();                                                   // 单例模式私有构造函数
-    ~Log();                                          
-    void async_write_log();                                  // 异步写入日志
-    void build_log_file(const std::tm& my_tm);               // 新建日志辅助函数
+    Log();
+    ~Log();
+    void AsyncWriteLog();                                      // 异步写入日志
+    void BuildLogFile(const std::tm&);                         // 日志文件初始化
 
 public:
-    // 关闭赋值构造函数与复制构造函数
     Log(const Log&) = delete;
     Log& operator=(const Log&) = delete;
 
-    // 获取单例实例
-    static Log& get_instance();
-    static void write_log_thread_func();
-    bool init(bool close_log, int max_lines = 5000, int log_buffer_size = 2048, int max_queue_size = 0);
-    void write_log(int level, const char* format, ...);
-    void flush();
+    static Log& GetInstance();                                  // 获取日志单例
+    static void Worker();                                       // 日志写入线程函数
+
+    bool Init(bool is_open, bool is_async = false);
+    void WriteLog(int level, const char* format, ...);          // 写入日志
+    void Flush();                                               // 刷新日志
+    bool IsOpen() const noexcept;                               // 检查日志系统是否打开
 };
 
-// 优化后的宏定义，避免重复调用 Log::get_instance()
-#define LOG_DEBUG(format, ...) do { \
-    auto& log_instance = Log::get_instance(); \
-    if(!m_open_log) { \
-        log_instance.write_log(0, format, ##__VA_ARGS__); \
-        log_instance.flush(); \
-    } \
-} while(0)
+#define LOG_BASE(level, format, ...) \
+    do {\
+        Log log = Log::GetInstance();\
+        if (log->IsOpen()) {\
+            log->WriteLog(level, format, ##__VA_ARGS__); \
+            log->Flush();\
+        }\
+    } while(0);
 
-#define LOG_INFO(format, ...) do { \
-    auto& log_instance = Log::get_instance(); \
-    if(!m_open_log) { \
-        log_instance.write_log(1, format, ##__VA_ARGS__); \
-        log_instance.flush(); \
-    } \
-} while(0)
+#define LOG_DEBUG(format, ...) do {LOG_BASE(0, format, ##__VA_ARGS__)} while(0);
+#define LOG_INFO(format, ...) do {LOG_BASE(1, format, ##__VA_ARGS__)} while(0);
+#define LOG_WARN(format, ...) do {LOG_BASE(2, format, ##__VA_ARGS__)} while(0);
+#define LOG_ERROR(format, ...) do {LOG_BASE(3, format, ##__VA_ARGS__)} while(0);
 
-#define LOG_WARN(format, ...) do { \
-    auto& log_instance = Log::get_instance(); \
-    if(!m_open_log) { \
-        log_instance.write_log(2, format, ##__VA_ARGS__); \
-        log_instance.flush(); \
-    } \
-} while(0)
-
-#define LOG_ERROR(format, ...) do { \
-    auto& log_instance = Log::get_instance(); \
-    if(!m_open_log) { \
-        log_instance.write_log(3, format, ##__VA_ARGS__); \
-        log_instance.flush(); \
-    } \
-} while(0)
-
-#endif // LOG_H_
+#endif  // LOG_H_

@@ -1,3 +1,10 @@
+/**
+ * @file log.cpp
+ * @author chenyinjie
+ * @date 2024-09-02
+ */
+
+#include <iostream>
 #include <cstring>
 #include <ctime>
 #include <chrono>
@@ -7,110 +14,106 @@
 
 #include "log.h"
 
-Log::Log(): 
-      m_path("./LogFiles/"),
-      m_log_name("logfile"),
-      m_cnt_lines(0),
-      m_is_sync(false),
-      m_day(0),
-      m_max_lines(5000),
-      m_max_buffer_size(2048),
-      m_open_log(false) {};
+Log::Log():cnt_lines_(0), today_(0), is_open_(false), is_async_(false){}
 
 Log::~Log() {
-    if (m_log_file_stream.is_open()) {
-        m_log_file_stream.close();
+    if (is_async_ && log_block_deque_ && !log_block_deque_->isEmpty()) {
+        log_block_deque_->flush();
+        log_block_deque_->close();
+    }
+    if (log_file_stream_.is_open()) {
+        std::lock_guard<std::mutex> lock(log_mutex_);
+        Flush();
+        log_file_stream_.close();
     }
 }
 
-void Log::async_write_log() {
-    std::string log_string;
-    while (m_log_queue->pop(log_string)) {
-        std::lock_guard<std::mutex> lock(m_log_mutex);
-        if (!log_string.empty()) {
-            m_log_file_stream << log_string << '\n';
+void Log::AsyncWriteLog() {
+    std::string log_str;
+    while (log_block_deque_->pop(log_str)) {
+        std::lock_guard<std::mutex> lock(log_mutex_);
+        if (!log_str.empty()) {
+            log_file_stream_ << log_str << "\n";
+            ++cnt_lines_;
         }
     }
+    Flush();
 }
 
-void Log::build_log_file(const std::tm& my_tm) {
-    if (m_day != my_tm.tm_mday || m_cnt_lines % m_max_lines == 0) {
-        m_log_file_stream.flush();
-        m_log_file_stream.close();
+void Log::BuildLogFile(const std::tm& my_tm) {
+    // 首先判断是否需要创建新日志
+    if (today_ != my_tm.tm_mday || cnt_lines_ % max_lines_ == 0) {
+        log_file_stream_.flush();
+        log_file_stream_.close();
 
-        if (m_day != my_tm.tm_mday) {
-            m_day = my_tm.tm_mday;
-            m_cnt_lines = 0;  // 当日期变化时重置行数
+        if (today_ != my_tm.tm_mday) {
+            today_ = my_tm.tm_mday;
+            cnt_lines_ = 0;
         }
 
-       std::string new_log_file_name = std::format("{}_{:02}_{:02}_{}-{}", 
+        std::string new_log_file_name = std::format("{}_{:02}_{:02}_{}-{}", 
                                         my_tm.tm_year + 1900, 
                                         my_tm.tm_mon + 1, 
                                         my_tm.tm_mday, 
-                                        m_log_name, 
-                                        m_cnt_lines / m_max_lines + 1
+                                        log_file_name_, 
+                                        cnt_lines_ / max_lines_ + 1
                                         );
 
-        m_log_file_stream.open(m_path + new_log_file_name, std::ios_base::out | std::ios_base::app);
+        log_file_stream_.open(log_path_ + new_log_file_name, std::ios_base::out | std::ios_base::app);
     }
 }
 
-Log& Log::get_instance() {
+Log& Log::GetInstance() {
     static Log instance;
     return instance;
 }
 
-void Log::write_log_thread_func() {
-    get_instance().async_write_log();
+void Log::Worker() {
+    GetInstance().AsyncWriteLog();
 }
 
-// 初始化日志模块
-bool Log::init(bool open_log, int max_lines, int log_buffer_size, int max_queue_size) {
-    // 根据阻塞队列的大小设置判断是否启用异步日志写入
-    if (max_queue_size >= 1) {
-        m_is_sync = true;
-        m_log_queue = std::make_unique<BlockQueue<std::string>>(max_queue_size);
-        std::thread log_writer_thread(&Log::write_log_thread_func);
-        log_writer_thread.detach();
-    }
-    // 设置写入缓冲区
-    m_open_log = open_log;
-    m_max_buffer_size = log_buffer_size;
-    m_max_lines = max_lines;
-    m_log_buffer_ptr = std::make_unique<char[]>(m_max_buffer_size);
-    memset(m_log_buffer_ptr.get(), '\0', m_max_buffer_size);
+bool Log::Init(bool is_open, bool is_async) {
+    if (!is_open_) return false;
 
-    // 获取当前的日期和时间
+    log_path_ = "./LogFiles";
+    log_file_name_ = "logfile";
+    max_lines_ = 50000;
+    cnt_lines_ = 0;
+    today_ = 0;
+    is_open_ = is_open;
+    is_async_ = is_async;
+
     time_t t = time(nullptr);
     struct tm* sys_tm = localtime(&t);
     struct tm my_tm = *sys_tm;
-    m_day = my_tm.tm_mday;
+    today_ = my_tm.tm_mday;
 
-    // 生成日志文件名
+    // 初始化创建新日志
     std::string new_log_file_name = std::format("{}_{:02}_{:02}_{}-{}", 
                                         my_tm.tm_year + 1900, 
                                         my_tm.tm_mon + 1, 
                                         my_tm.tm_mday, 
-                                        m_log_name, 
-                                        m_cnt_lines / m_max_lines + 1
+                                        log_file_name_, 
+                                        cnt_lines_ / max_lines_ + 1
                                         );
 
-    // 打开日志文件
-    m_log_file_stream.open(m_path + new_log_file_name, std::ios_base::out | std::ios_base::app);
-    if (!m_log_file_stream.is_open()) {
+    log_file_stream_.open(log_path_ + new_log_file_name, std::ios_base::out | std::ios_base::app);
+    if (!log_file_stream_.is_open()) {
+        std::cerr << "Init Log System failed." << std::endl;
         return false;
     }
+
+    // 是否启用异步
+    if (is_async_) {
+        log_block_deque_ = std::make_unique<BlockDeque<std::string>>(1024);
+        std::thread log_writer_thread(&Log::Worker);
+        log_writer_thread.detach();
+    }
+
     return true;
 }
 
-// 日志写入系统
-void Log::write_log(int level, const char* format, ...) {
-    auto now = std::chrono::system_clock::now();
-    auto time_t_now = std::chrono::system_clock::to_time_t(now);
-    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()) % 1000000;
-    std::tm my_tm;
-    localtime_r(&time_t_now, &my_tm);
-
+void Log::WriteLog(int level, const char* format, ...) {
     std::string log_level_description = [level]() -> std::string {
         switch (level) {
             case 0: return "[DEBUG]:";
@@ -121,14 +124,18 @@ void Log::write_log(int level, const char* format, ...) {
         }
     }();
 
-    std::lock_guard<std::mutex> lock(m_log_mutex);
+    std::lock_guard<std::mutex> lock(log_mutex_);
 
-    // 判断是否需要创建新文件
-    build_log_file(my_tm);
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()) % 1000000;
+    std::tm my_tm;
+    localtime_r(&time_t_now, &my_tm);
 
+    BuildLogFile(my_tm);
     va_list valst;
     va_start(valst, format);
-    std::vector<char> buffer(m_max_buffer_size);
+    std::vector<char> buffer(1024);
     int n = std::vsnprintf(buffer.data(), buffer.size(), format, valst);
     va_end(valst);
 
@@ -142,7 +149,7 @@ void Log::write_log(int level, const char* format, ...) {
         va_end(valst);
     }
 
-    std::string log_str = std::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06} {} {}", 
+    std::string log_msg = std::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06} {} {}", 
                                       my_tm.tm_year + 1900, 
                                       my_tm.tm_mon + 1, 
                                       my_tm.tm_mday,
@@ -154,16 +161,20 @@ void Log::write_log(int level, const char* format, ...) {
                                       buffer.data());
     
     // 根据同步还是异步判断是存入阻塞队列还是直接写入文件
-    if (m_is_sync && !m_log_queue->isFull()) {
-        m_log_queue->push(log_str);
+    if (is_async_ && !log_block_deque_->isFull()) {
+        log_block_deque_->push_back(log_msg);
     } else {
-        m_log_file_stream << log_str << '\n';
+        log_file_stream_ << log_msg << std::endl;
+        ++cnt_lines_;
     }
-
-    ++m_cnt_lines;
 }
 
-void Log::flush() {
-    std::lock_guard<std::mutex> lock(m_log_mutex);
-    m_log_file_stream.flush();
+void Log::Flush() {
+    std::lock_guard<std::mutex> lock(log_mutex_);
+    log_file_stream_.flush();
+}
+
+bool Log::IsOpen() const noexcept {
+    std::lock_guard<std::mutex> lock(log_mutex_);
+    return is_open_;
 }
