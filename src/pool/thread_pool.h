@@ -1,112 +1,110 @@
+/**
+ * @file thread_pool.h
+ * @author chenyinjie
+ * @date 2024-09-11
+ */
+
 #ifndef THREAD_POOL_H_
 #define THREAD_POOL_H_
 
-#include <vector>
+#include "../log/log.h"
+
 #include <queue>
-#include <memory>
+#include <vector>
 #include <mutex>
-#include <condition_variable>
 #include <thread>
+#include <cassert>
 #include <functional>
-#include <stdexcept>
+#include <condition_variable>
 
-#include "db_connection_pool.h"
-
-template <typename F>
 class ThreadPool {
-private:
-    bool m_stop;                                    // 线程池停止标志
-    int m_max_thread_nums;                          // 线程池最大线程数
-    int m_max_task_nums;                            // 任务请求队列最大请求数
-    std::vector<std::thread> m_threads_vector;      // 线程池数组
-    std::queue<F*> m_tasks_queue;                   // 任务请求队列
-    std::mutex m_tasks_queue_mutex;                 // 请求队列互斥锁
-    std::condition_variable m_con_var;              // 请求队列线程同步条件变量
-    ConnectionPool& m_db_connection_pool;           // 数据库连接池
-    int m_actor_model;                              // 线程池模型
-
-private:
-    void work();
-    void run();
-
 public:
-    ThreadPool(int actor_model, int max_thread_nums, int max_task_nums, ConnectionPool& connection_pool);
+    static ThreadPool& GetInstance(size_t max_thread_nums = 8, size_t max_task_nums = 16);
+    ThreadPool(const ThreadPool&) = delete;
+    ThreadPool& operator=(const ThreadPool&) = delete;
+
+    template <typename F>
+    void AddTask(F&& task);
+
+private:
+    explicit ThreadPool(size_t max_thread_nums = 8, size_t max_task_nums = 16);
     ~ThreadPool();
 
-    bool enqueue_without_state(F* task, int state);
-    bool enqueue_with_state(F* task);
+    bool is_stop_;
+    std::mutex thread_pool_mtx_;
+    std::condition_variable con_var_;
+    size_t max_task_nums_;
+    std::vector<std::thread> thread_pool_;
+    std::queue<std::function<void()>> task_queue_;
 };
 
-template <typename F>
-void ThreadPool<F>::work() {
-    run();
+ThreadPool& ThreadPool::GetInstance(size_t max_thread_nums = 8, size_t max_task_nums = 16) {
+    static ThreadPool thread_pool_instance(max_thread_nums, max_task_nums);
+    return thread_pool_instance;
 }
 
-template <typename F>
-void ThreadPool<F>::run() {
-    while (true) {
-        F* task;
-        {
-            std::unique_lock<std::mutex> lock(m_tasks_queue_mutex);
-            m_con_var.wait(lock, [this]() {
-                return m_stop || !m_tasks_queue.empty();
-            });
+ThreadPool::ThreadPool(size_t max_thread_nums = 4, size_t max_task_nums = 16): max_task_nums_(max_task_nums), is_stop_(false) {
+    assert(max_thread_nums > 0);
+    for (size_t i = 0; i < max_thread_nums; ++i) {
+        thread_pool_.emplace_back([this]() {
+            while (true) {
+                std::function<void()> task;
+                {
+                    std::unique_lock<std::mutex> locker(thread_pool_mtx_);
+                    con_var_.wait(locker, [this]() {return !task_queue_.empty() || is_stop_;});
+                    if (is_stop_ && task_queue_.empty()) return;
+                    task = std::move(task_queue_.front());
+                    task_queue_.pop();
+                }
 
-            if (m_stop && m_tasks_queue.empty()) return;
-            task = m_tasks_queue.front();
-            m_tasks_queue.pop();
-        }
-
-        if (!task) continue;
-
-        // TODO: definetion for task.
-        if (m_actor_model == 0) {
-            
-        } else {
-
-        }
+                bool is_log_open = Log::GetInstance()->IsOpen();
+                try {
+                    if (is_log_open) {
+                        LOG_INFO("Thread is executing a task.");
+                    }
+                    task();
+                } catch(const std::exception& e) {
+                    if (is_log_open) {
+                        LOG_ERROR("Exception in task: ", e.what());
+                    } else {
+                        std::cerr << "Exception in task: " << e.what() << std::endl;
+                    }
+                } catch(...) {
+                    if (is_log_open) {
+                        LOG_INFO("Something happend.");
+                    } else {
+                        std::cerr << "Unkown exception in task." << std::endl;
+                    }
+                }
+            }
+        });
     }
 }
 
-template <typename F>
-ThreadPool<F>::ThreadPool(int actor_model,
-                          int max_thread_nums,
-                          int max_task_nums,
-                          ConnectionPool& connection_pool) {
-  m_stop = false;
-  m_actor_model = actor_model;
-  m_max_thread_nums = max_thread_nums;
-  m_max_task_nums = max_task_nums;
-  m_db_connection_pool = connection_pool;
-
-  if (m_max_thread_nums <= 0 || m_max_task_nums <= 0)
-    throw std::invalid_argument("Invalid thread number or task number.");
-
-  for (int i = 0; i < m_max_thread_nums; ++i) {
-    m_threads_vector.emplace([this]() {
-
-    });
-  }
-}
-
-template <typename F>
-ThreadPool<F>::~ThreadPool() {
+ThreadPool::~ThreadPool() {
     {
-        std::unique_lock<std::mutex> lock(m_tasks_queue_mutex);
-        m_stop = true;
+        std::lock_guard<std::mutex> locker(thread_pool_mtx_);
+        is_stop_ = true;
     }
-    m_con_var.notify_all();
-    for (auto& thread : m_threads_vector) { 
+    con_var_.notify_all();
+
+    for (auto& thread : thread_pool_) { 
         if (thread.joinable()) thread.join();
     }
 }
 
 template <typename F>
-bool ThreadPool<F>::enqueue_without_state(F* task, int state) {
-}
+void ThreadPool::AddTask(F&& task) {
+    if (is_stop_) {
+        throw std::runtime_error("Thread Pool has stopped, can not add new task.");
+    }
 
-template <typename F>
-bool ThreadPool<F>::enqueue_with_state(F* task) {
+    {
+        std::unique_lock<std::mutex> locker(thread_pool_mtx_);
+        con_var_.wait(locker, [this]() {return task_queue_.size() < max_task_nums_;});
+        task_queue_.emplace(std::forward<F>(task));
+    }
+    con_var_.notify_one();
 }
 
 #endif
