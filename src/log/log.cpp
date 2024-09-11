@@ -64,13 +64,13 @@ void Log::BuildLogFile(const std::tm& my_tm) {
     }
 }
 
-Log& Log::GetInstance() {
-    static Log instance;
-    return instance;
+Log* Log::GetInstance() {
+    static Log log_instance;
+    return &log_instance;
 }
 
 void Log::Worker() {
-    GetInstance().AsyncWriteLog();
+    GetInstance()->AsyncWriteLog();
 }
 
 bool Log::Init(bool is_open, bool is_async, int max_queue_size) {

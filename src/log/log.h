@@ -24,7 +24,7 @@ public:
     Log(const Log&) = delete;
     Log& operator=(const Log&) = delete;
 
-    static Log& GetInstance();                                  // 获取日志单例
+    static Log* GetInstance();                                  // 获取日志单例
     static void Worker();                                       // 日志写入线程函数
 
     bool Init(bool is_open, bool is_async = false, int max_queue_size = 1024);
@@ -46,7 +46,7 @@ private:
     Buffer buffer_;                                              // 自定义缓冲区 
     std::unique_ptr<BlockDeque<std::string>> log_block_deque_;   // 日志消息阻塞队列
     std::unique_ptr<std::thread> log_async_thread_;              // 日志异步写线程
-    mutable std::mutex log_mtx_;                               // 日志文件互斥锁
+    mutable std::mutex log_mtx_;                                 // 日志文件互斥锁
     
     Log();
     ~Log();
@@ -56,7 +56,7 @@ private:
 
 #define LOG_BASE(level, format, ...) \
     do {\
-        Log log = Log::GetInstance();\
+        Log* log = Log::GetInstance();\
         if (log->IsOpen()) {\
             log->WriteLog(level, format, ##__VA_ARGS__); \
             log->Flush();\
