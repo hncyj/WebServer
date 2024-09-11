@@ -45,8 +45,9 @@ private:
     std::fstream log_file_stream_;                               // 日志文件流
     Buffer buffer_;                                              // 自定义缓冲区 
     std::unique_ptr<BlockDeque<std::string>> log_block_deque_;   // 日志消息阻塞队列
-    mutable std::mutex log_mutex_;                               // 日志文件互斥锁
-
+    std::unique_ptr<std::thread> log_async_thread_;              // 日志异步写线程
+    mutable std::mutex log_mtx_;                               // 日志文件互斥锁
+    
     Log();
     ~Log();
     void AsyncWriteLog();                                        // 异步写入日志

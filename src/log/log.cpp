@@ -17,13 +17,14 @@
 Log::Log():cnt_lines_(0), today_(0), is_open_(false), is_async_(false), buffer_(4096) {}
 
 Log::~Log() {
-    if (is_async_ && log_block_deque_ && !log_block_deque_->isEmpty()) {
+    if (is_async_ && log_async_thread_ && log_async_thread_->joinable()) {
         log_block_deque_->flush();
         log_block_deque_->close();
+        log_async_thread_->join();
     }
     if (log_file_stream_.is_open()) {
-        std::lock_guard<std::mutex> lock(log_mutex_);
         Flush();
+        std::lock_guard<std::mutex> lock(log_mtx_);
         log_file_stream_.close();
     }
 }
@@ -31,7 +32,7 @@ Log::~Log() {
 void Log::AsyncWriteLog() {
     std::string log_str = "";
     while (log_block_deque_->pop(log_str)) {
-        std::lock_guard<std::mutex> lock(log_mutex_);
+        std::lock_guard<std::mutex> lock(log_mtx_);
         if (!log_str.empty()) {
             log_file_stream_ << log_str << "\n";
             ++cnt_lines_;
@@ -108,8 +109,8 @@ bool Log::Init(bool is_open, bool is_async, int max_queue_size) {
     if (is_async_ && max_queue_size_ > 0) {
         // 固定队列大小
         log_block_deque_ = std::make_unique<BlockDeque<std::string>>(max_queue_size_);
-        std::thread log_writer_thread(&Log::Worker, this);
-        log_writer_thread.detach();
+        log_async_thread_ = std::make_unique<std::thread>(&Log::Worker, this);
+        // log_writer_thread.detach();
     } else {
         std::cerr << "Async Log Write init failed." << std::endl;
         return false;
@@ -129,7 +130,7 @@ void Log::WriteLog(int level, const char* format, ...) {
         }
     }();
 
-    std::lock_guard<std::mutex> lock(log_mutex_);
+    std::lock_guard<std::mutex> lock(log_mtx_);
 
     auto now = std::chrono::system_clock::now();
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
@@ -169,11 +170,11 @@ void Log::WriteLog(int level, const char* format, ...) {
 }
 
 void Log::Flush() {
-    std::lock_guard<std::mutex> lock(log_mutex_);
+    std::lock_guard<std::mutex> lock(log_mtx_);
     log_file_stream_.flush();
 }
 
 bool Log::IsOpen() const noexcept {
-    std::lock_guard<std::mutex> lock(log_mutex_);
+    std::lock_guard<std::mutex> lock(log_mtx_);
     return is_open_;
 }
