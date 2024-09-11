@@ -14,6 +14,7 @@
 #include <cassert>
 #include <unistd.h>
 #include <sys/uio.h>
+#include <stdarg.h>
 #include <mutex>
 
 class Buffer {
@@ -21,16 +22,20 @@ public:
     explicit Buffer(int init_size = 4096);
     ~Buffer() = default;
 
+    void Clear();                               // 清空缓冲区
+
     size_t ReadableLen() const;                 // 当前可读数据长度
     size_t WritableLen() const;                 // 当前可写数据长度
-    const char* ReadPtr() const;                // 可读数据起始指针
-    const char* WritePtr() const;               // 可写数据起始指针
+    char* ReadPtr() const;                      // 可读数据起始指针
+    char* WritePtr() const;                     // 可写数据起始指针
     
     std::string ReadAllToStr();                 // 读取缓存区全部可读数据转存为字符串并移动读指针
     
     void Append(const char*, size_t);           // 追加指定长度数据至缓冲区写指针后
     void Append(const std::string&);            // 追加字符串数据至缓冲写指针后
     void Append(const Buffer&);                 // 追加另一缓冲区数据至缓冲区写指针后
+
+    int AppendFormatted(const char* format, va_list args);
 
     ssize_t ReadFromFd(int, int*);              // 从指定文件描述符中读取数据到缓存区中
     ssize_t WriteToFd(int, int*);               // 将缓存区中的数据写入文件描述符

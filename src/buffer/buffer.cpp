@@ -11,6 +11,12 @@
 
 Buffer::Buffer(int init_size): buffer_(init_size), readPos_(0), writePos_(0) {}
 
+void Buffer::Clear() {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    readPos_ = 0;
+    writePos_ = 0;
+}
+
 size_t Buffer::ReadableLen() const {
   return writePos_ - readPos_;
 }
@@ -19,12 +25,12 @@ size_t Buffer::WritableLen() const {
     return buffer_.size() - writePos_;
 }
 
-const char* Buffer::ReadPtr() const {
-    return BufferPtr() + readPos_;
+char* Buffer::ReadPtr() const {
+    return const_cast<char*>(BufferPtr() + readPos_);
 }
 
-const char* Buffer::WritePtr() const {
-    return BufferPtr() + writePos_;
+char* Buffer::WritePtr() const {
+    return const_cast<char*>(BufferPtr() + writePos_);
 }
 
 std::string Buffer::ReadAllToStr() {
@@ -49,6 +55,29 @@ void Buffer::Append(const std::string& str) {
 
 void Buffer::Append(const Buffer& buf) {
     Append(buf.ReadPtr(), buf.ReadableLen());
+}
+
+int Buffer::AppendFormatted(const char* format, va_list args) {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int len = std::vsnprintf(nullptr, 0, format, args_copy);
+    va_end(args_copy);
+
+    if (len <= 0) {
+        return len;
+    }
+    EnsureWritable(len + 1);
+
+    va_copy(args_copy, args);
+    len = std::vsnprintf(WritePtr(), WritableLen(), format, args_copy);
+    va_end(args_copy);
+
+    if (len > 0) {
+        writePos_ += len;
+    }
+
+    return len;
 }
 
 ssize_t Buffer::ReadFromFd(int fd, int* saveErrno) {
