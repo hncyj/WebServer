@@ -14,7 +14,7 @@
 
 #include "log.h"
 
-Log::Log():cnt_lines_(0), today_(0), is_open_(false), is_async_(false){}
+Log::Log():cnt_lines_(0), today_(0), is_open_(false), is_async_(false), buffer_(4096) {}
 
 Log::~Log() {
     if (is_async_ && log_block_deque_ && !log_block_deque_->isEmpty()) {
@@ -29,7 +29,7 @@ Log::~Log() {
 }
 
 void Log::AsyncWriteLog() {
-    std::string log_str;
+    std::string log_str = "";
     while (log_block_deque_->pop(log_str)) {
         std::lock_guard<std::mutex> lock(log_mutex_);
         if (!log_str.empty()) {
@@ -72,16 +72,17 @@ void Log::Worker() {
     GetInstance().AsyncWriteLog();
 }
 
-bool Log::Init(bool is_open, bool is_async) {
+bool Log::Init(bool is_open, bool is_async, int max_queue_size) {
     if (!is_open_) return false;
 
-    log_path_ = "./LogFiles";
+    log_path_ = "./LogFiles/";
     log_file_name_ = "logfile";
     max_lines_ = 50000;
     cnt_lines_ = 0;
     today_ = 0;
     is_open_ = is_open;
     is_async_ = is_async;
+    max_queue_size_ = max_queue_size;
 
     time_t t = time(nullptr);
     struct tm* sys_tm = localtime(&t);
@@ -104,10 +105,14 @@ bool Log::Init(bool is_open, bool is_async) {
     }
 
     // 是否启用异步
-    if (is_async_) {
-        log_block_deque_ = std::make_unique<BlockDeque<std::string>>(1024);
-        std::thread log_writer_thread(&Log::Worker);
+    if (is_async_ && max_queue_size_ > 0) {
+        // 固定队列大小
+        log_block_deque_ = std::make_unique<BlockDeque<std::string>>(max_queue_size_);
+        std::thread log_writer_thread(&Log::Worker, this);
         log_writer_thread.detach();
+    } else {
+        std::cerr << "Async Log Write init failed." << std::endl;
+        return false;
     }
 
     return true;
@@ -132,22 +137,13 @@ void Log::WriteLog(int level, const char* format, ...) {
     std::tm my_tm;
     localtime_r(&time_t_now, &my_tm);
 
+    // 判断是否分文件
     BuildLogFile(my_tm);
+
     va_list valst;
     va_start(valst, format);
-    std::vector<char> buffer(1024);
-    int n = std::vsnprintf(buffer.data(), buffer.size(), format, valst);
+    buffer_.AppendFormatted(format, valst);
     va_end(valst);
-
-    if (n >= 0 && static_cast<size_t>(n) < buffer.size()) {
-        buffer[n] = '\0';  // 保证字符串结尾
-    } else {
-        // 处理缓冲区不足的情况
-        buffer.resize(n + 1);
-        va_start(valst, format);
-        std::vsnprintf(buffer.data(), buffer.size(), format, valst);
-        va_end(valst);
-    }
 
     std::string log_msg = std::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06} {} {}", 
                                       my_tm.tm_year + 1900, 
@@ -158,7 +154,7 @@ void Log::WriteLog(int level, const char* format, ...) {
                                       my_tm.tm_sec, 
                                       micros.count(), 
                                       log_level_description, 
-                                      buffer.data());
+                                      buffer_.ReadPtr());
     
     // 根据同步还是异步判断是存入阻塞队列还是直接写入文件
     if (is_async_ && !log_block_deque_->isFull()) {
@@ -167,6 +163,9 @@ void Log::WriteLog(int level, const char* format, ...) {
         log_file_stream_ << log_msg << std::endl;
         ++cnt_lines_;
     }
+
+    // 清空缓冲区
+    buffer_.Clear();
 }
 
 void Log::Flush() {
