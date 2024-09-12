@@ -1,78 +1,58 @@
-#ifndef TIMER_H_
-#define TIMER_H_
+/**
+ * @file timer.h
+ * @author chenyinjie
+ * @date 2024-09-12
+ */
 
-#include <unistd.h>
-#include <signal.h>
-#include <sys/epoll.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <cassert>
-#include <cstring>
-#include <ctime>
-#include <memory>
+#ifndef TIMER_H
+#define TIMER_H
+
+#include "../log/log.h"
+
+#include <iostream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <algorithm>
 #include <functional>
+#include <chrono>
+#include <optional>
 
-#include "log.h"
+using TimeoutCallBack = std::function<void()>;
+using Clock = std::chrono::steady_clock;
+using MS = std::chrono::milliseconds;
+using TimeStamp = std::chrono::steady_clock::time_point;
 
-class UtilTimer;
-
-struct ClientData {
-    sockaddr_in client_address;         // 客户端地址
-    int socket_fd;                      // 套接字文件描述符
-    std::shared_ptr<UtilTimer> timer;   // 定时器指针
+struct Timer {
+    int id_;
+    TimeStamp expires_;
+    TimeoutCallBack callback_f_;
+    Timer(int id, TimeStamp expires, TimeoutCallBack callback_f)
+        : id_(id), expires_(expires), callback_f_(callback_f) {};
 };
 
-class UtilTimer {
+class TimerHeap {
 public:
-    time_t expire_time;                                 // 任务超时时间
-    ClientData* usr_data;                               // 客户端数据
-    std::shared_ptr<UtilTimer> pre;                     // 指向前一个定时器的指针
-    std::shared_ptr<UtilTimer> next;                    // 指向后一个定时器的指针
-    std::function<void(ClientData*)> callback_func;     // 回调函数
+    TimerHeap();
+    ~TimerHeap();
 
-    UtilTimer() = default;
-    ~UtilTimer() = default;
-};
+    void AddTimer(int id, int timeout, const TimeoutCallBack& cb_f);    // 添加定时器
+    void UpdateTimer(int id, int new_expires);                          // 更新定时器
+    void Worker(int id);                                                // 执行定时器绑定的回调函数
+    void CleanExpiredTimer();                                           // 清理到期计时器
+    void RemoveTopTimer();                                              // 移除最早到期定时器
+    void ClearAllTimers();                                              // 清空所以定时器
+    std::optional<int> GetNextTimerExpireTime();                        // 获取当前未到期的最早定时器时间点
 
-
-class SortTimerList {
 private:
-    std::shared_ptr<UtilTimer> head;
-    std::shared_ptr<UtilTimer> tail;
+    void RemoveTimer(size_t idx);                                       // 移除堆中指定索引的定时器
+    void HeapifyUp(size_t idx);                                         // 向堆顶更新堆
+    void HeapifyDown(size_t idx, size_t n);                             // 向堆底更新堆
+    void SwapTimers(size_t i, size_t j);                                // 交换指定堆索引的两个定时器
 
-    void add_timer(std::shared_ptr<UtilTimer> timer, std::shared_ptr<UtilTimer> lst_head);
-
-public:
-    SortTimerList() = default;
-    ~SortTimerList() = default;
-    
-    void add_timer(std::shared_ptr<UtilTimer> timer);
-    void adjust_timer(std::shared_ptr<UtilTimer> timer);
-    void delete_timer(std::shared_ptr<UtilTimer> timer);
-    void tick();
+    std::vector<Timer> timer_heap_;
+    std::unordered_map<int, size_t> id_maps_;          // 记录定时器id到数组索引idx的映射关系
+    bool is_log_open;
 };
-
-class Utils {
-public:
-    static int* u_pipe_fd;
-    static int u_epoll_fd;
-    int m_time_solt = 0;
-    SortTimerList m_timer_lst;
-
-    Utils() = default;
-    ~Utils() = default;
-
-    void init(int time_slot);
-    int set_no_block(int fd);
-    void add_fd(int epoll_fd, int fd, bool one_shot, int trigger_mode);
-    static void sig_handler(int signal);
-    void add_signal(int signal, void(handler)(int), bool restart = true);
-    void timer_handler();
-    void show_error(int connect_fd, const char* info);
-};
-
-void callback_fun(ClientData* usr_data);
 
 #endif
