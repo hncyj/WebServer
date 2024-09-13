@@ -32,16 +32,16 @@ bool Epoll::AddFd(int fd, uint32_t events) {
 
 bool Epoll::ModifyFd(int fd, uint32_t events) {
     if (fd < 0) return false;
-    epoll_event event = {0};
-    event.data.fd = fd;
-    event.events = events;
-    return 0 == epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &event);
+    epoll_event ev = {0};
+    ev.data.fd = fd;
+    ev.events = events;
+    return 0 == epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev);
 }
 
 bool Epoll::DeleteFd(int fd, uint32_t events) {
     if (fd < 0) return false;
-    epoll_event event = {0};
-    return 0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, &event);
+    epoll_event ev = {0};
+    return 0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, &ev);
 }
 
 int Epoll::Wait(int timeoutMs) {
