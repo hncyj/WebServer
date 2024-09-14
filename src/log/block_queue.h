@@ -8,7 +8,6 @@
 #define BLOCK_QUEUE_H_
 
 #include <deque>
-#include <cassert>
 #include <mutex>
 #include <condition_variable>
 
@@ -34,8 +33,11 @@ public:
     bool getFrontElement(T&);
     bool getLastElement(T&);
 
+    bool pushFront(T&&);
     bool pushFront(const T&);
+    bool pushBack(T&&);
     bool pushBack(const T&);
+    
     bool popFront(T&);
     bool popFront(T&, int);  // 超时版本
     
@@ -121,11 +123,43 @@ bool BlockDeque<T>::getLastElement(T& element) {
 }
 
 template <typename T>
+bool BlockDeque<T>::pushFront(T&& element) {
+    std::unique_lock<std::mutex> locker(deque_mtx_);
+    producer_con_var_.wait(locker, [this]() {return block_deque_.size() < deque_capacity_ || !is_deque_open_;});
+    if (!is_deque_open_) return false;
+    try {
+        block_deque_.push_front(std::move(element));
+    } catch (...) {
+        throw;
+    }
+    consumer_con_var_.notify_one();
+    return true;
+}
+
+template <typename T>
 bool BlockDeque<T>::pushFront(const T& element) {
     std::unique_lock<std::mutex> locker(deque_mtx_);
     producer_con_var_.wait(locker, [this] {return block_deque_.size() < deque_capacity_ || !is_deque_open_;});
     if (!is_deque_open_) return false;
-    block_deque_.push_front(element);
+    try {
+        block_deque_.push_front(element);
+    } catch (...) { // 偷个懒，可能存在内存申请失败的问题
+        throw;
+    }
+    consumer_con_var_.notify_one();
+    return true;
+}
+
+template <typename T>
+bool BlockDeque<T>::pushBack(T&& element) {
+    std::unique_lock<std::mutex> locker(deque_mtx_);
+    producer_con_var_.wait(locker, [this]() {return block_deque_.size() < deque_capacity_ || !is_deque_open_;});
+    if (!is_deque_open_) return false;
+    try {
+        block_deque_.push_back(std::move(element));
+    } catch (...) {
+        throw;
+    }
     consumer_con_var_.notify_one();
     return true;
 }
@@ -135,7 +169,11 @@ bool BlockDeque<T>::pushBack(const T& element) {
     std::unique_lock<std::mutex> locker(deque_mtx_);
     producer_con_var_.wait(locker, [this] {return block_deque_.size() < deque_capacity_ || !is_deque_open_;});
     if (!is_deque_open_) return false;
-    block_deque_.push_back(element);
+    try {
+        block_deque_.push_back(element);
+    } catch (...) {
+        throw;
+    }
     consumer_con_var_.notify_one();
     return true;
 }
