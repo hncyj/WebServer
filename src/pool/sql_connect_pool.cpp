@@ -43,7 +43,7 @@ void SQLConnectPool::Init(const char* host, const char* user, const char* passwo
     for (int i = 0; i < connect_nums; ++i) {
         MYSQL* sql = nullptr;
         sql = mysql_init(nullptr);
-        bool is_log_open = Log::GetInstance()->IsOpen();
+        bool is_log_open = Log::getInstance().isOpen();
         if (!sql) {
             if (is_log_open) {
                 LOG_ERROR("MYSQL init error.");

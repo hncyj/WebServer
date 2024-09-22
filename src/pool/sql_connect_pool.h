@@ -9,6 +9,7 @@
 
 #include "../log/log.h"
 
+#include <iostream>
 #include <string>
 #include <queue>
 #include <mutex>
