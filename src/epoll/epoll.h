@@ -9,24 +9,26 @@
 
 #include "../log/log.h"
 
+#include <iostream>
+#include <vector>
+#include <cassert>
 #include <sys/epoll.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <assert.h>
-#include <vector>
 #include <errno.h>
 
+// 将epoll实例封装为一个类
 class Epoll {
 public:
     explicit Epoll(int max_event_nums = 1024);
     ~Epoll();
 
-    bool AddFd(int fd, uint32_t events);
-    bool ModifyFd(int fd, uint32_t events);
-    bool DeleteFd(int fd, uint32_t events);
-    int Wait(int timeoutMs = -1);
+    bool AddFd(int fd, uint32_t interest_ev);
+    bool ModifyFd(int fd, uint32_t interest_ev);
+    bool DeleteFd(int fd, uint32_t interest_ev);
+    int EpollWait(int timeoutMs = -1);
     int GetEventFd(size_t idx) const;
-    uint32_t GetEvents(size_t idx) const;
+    uint32_t GetEventsInterest(size_t idx) const;
 
 private:
     int epoll_fd_;
