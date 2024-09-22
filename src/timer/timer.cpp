@@ -8,7 +8,7 @@
 
 TimerHeap::TimerHeap() {
     timer_heap_.reserve(64);
-    is_log_open = Log::GetInstance()->IsOpen();
+    is_log_open = Log::getInstance().isOpen();
 }
 
 TimerHeap::~TimerHeap() {
