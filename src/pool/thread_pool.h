@@ -9,6 +9,7 @@
 
 #include "../log/log.h"
 
+#include <iostream>
 #include <queue>
 #include <vector>
 #include <mutex>
@@ -57,7 +58,7 @@ ThreadPool::ThreadPool(size_t max_thread_nums = 4, size_t max_task_nums = 16): m
                     task_queue_.pop();
                 }
 
-                bool is_log_open = Log::GetInstance()->IsOpen();
+                bool is_log_open = Log::getInstance().isOpen();
                 try {
                     if (is_log_open) {
                         LOG_INFO("Thread is executing a task.");
