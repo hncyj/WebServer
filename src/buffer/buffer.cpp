@@ -9,20 +9,19 @@
 
 #include "buffer.h"
 
-Buffer::Buffer(int init_size): buffer_(init_size), readPos_(0), writePos_(0) {}
-
-void Buffer::Clear() {
-    std::lock_guard<std::mutex> lock(buffer_mtx_);
-    readPos_ = 0;
-    writePos_ = 0;
-}
+Buffer::Buffer(int init_size)
+    : buffer_(init_size), readPos_(0), writePos_(0) {}
 
 size_t Buffer::ReadableLen() const {
-  return writePos_ - readPos_;
+    return writePos_ - readPos_;
 }
 
 size_t Buffer::WritableLen() const {
     return buffer_.size() - writePos_;
+}
+
+size_t Buffer::PrependableLen() const {
+    return readPos_;
 }
 
 char* Buffer::ReadPtr() const {
@@ -33,13 +32,29 @@ char* Buffer::WritePtr() const {
     return const_cast<char*>(BufferPtr() + writePos_);
 }
 
-std::string Buffer::ReadAllToStr() {
-  std::lock_guard<std::mutex> lock(buffer_mtx_);
-  size_t readable_len = ReadableLen();
-  std::string str(ReadPtr(), readable_len);
-  readPos_ += readable_len;
+void Buffer::ReadLen(size_t len) {
+    assert(len <= ReadableLen());
+    readPos_ += len;
+}
 
-  return str;
+void Buffer::ReadToPtr(const char* end) {
+  assert(ReadPtr() <= end);
+  ReadLen(end - ReadPtr());
+}
+
+void Buffer::ReadAll() {
+    memset(buffer_.data(), 0, buffer_.size());
+    readPos_ = 0;
+    writePos_ = 0;
+}
+
+std::string Buffer::ReadAllToStr() {
+    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    size_t readable_len = ReadableLen();
+    std::string str(ReadPtr(), readable_len);
+    readPos_ += readable_len;
+
+    return str;
 }
 
 void Buffer::Append(const char* data, size_t len) {
