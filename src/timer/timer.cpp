@@ -93,10 +93,11 @@ void TimerHeap::RemoveTopTimer() {
     RemoveTimer(0);
 }
 
-std::optional<int> TimerHeap::GetNextTimerExpireTime() {
+int TimerHeap::GetNextTimerExpireTime() {
     CleanExpiredTimer();
-    if (timer_heap_.empty()) return std::nullopt;
+    if (timer_heap_.empty()) return -1;
     int t = std::chrono::duration_cast<MS>(timer_heap_.front().expires_ - Clock::now()).count();
+
     return t < 0 ? 0 : t;
 }
 

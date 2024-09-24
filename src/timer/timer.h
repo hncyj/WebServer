@@ -42,7 +42,7 @@ public:
     void CleanExpiredTimer();                                           // 清理到期计时器
     void RemoveTopTimer();                                              // 移除最早到期定时器
     void ClearAllTimers();                                              // 清空所以定时器
-    std::optional<int> GetNextTimerExpireTime();                        // 获取当前未到期的最早定时器时间点
+    int GetNextTimerExpireTime();                        // 获取当前未到期的最早定时器时间点
 
 private:
     void RemoveTimer(size_t idx);                                       // 移除堆中指定索引的定时器
