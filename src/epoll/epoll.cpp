@@ -93,7 +93,7 @@ bool Epoll::ModifyFd(int fd, uint32_t events) {
     return true;
 }
 
-bool Epoll::DeleteFd(int fd, uint32_t events) {
+bool Epoll::DeleteFd(int fd) {
     if (fd < 0) {
         if (is_log_open) {
             LOG_ERROR("Invalid file descriptor for deletion: %d", fd);

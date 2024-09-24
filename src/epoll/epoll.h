@@ -25,7 +25,7 @@ public:
 
     bool AddFd(int fd, uint32_t interest_ev);
     bool ModifyFd(int fd, uint32_t interest_ev);
-    bool DeleteFd(int fd, uint32_t interest_ev);
+    bool DeleteFd(int fd);
     int EpollWait(int timeoutMs = -1);
     int GetEventFd(size_t idx) const;
     uint32_t GetEventsInterest(size_t idx) const;
