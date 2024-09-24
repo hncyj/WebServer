@@ -37,7 +37,7 @@ public:
     std::string GetPost(const std::string& key) const;
     std::string GetPost(const char* key) const;
 
-    bool IsKeepAlive();
+    bool IsKeepAlive() const;
 
 private:
     bool ParseRequestLine(const std::string& line);
