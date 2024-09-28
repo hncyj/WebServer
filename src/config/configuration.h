@@ -14,7 +14,7 @@ public:
     Configuration(int port = 8080, int db_connect_nums = 8, int thread_nums = 8, int async = 1);
     ~Configuration() = default;
 
-    void parse_args(int argc, char* argv[]);
+    void ParseArgs(int argc, char* argv[]);
 
     int PORT;                       // -p: 端口号
     int DB_CONNECT_NUMS;            // -c: 数据库连接池数量

@@ -13,7 +13,7 @@
 Configuration::Configuration(int port = 8080, int db_connect_nums = 8, int thread_nums = 8, int async = 1)
 : PORT(port), DB_CONNECT_NUMS(db_connect_nums), THREAD_NUMS(thread_nums), ASYNC_MODE(async) {}
 
-void Configuration::parse_args(int argc, char* argv[]) {
+void Configuration::ParseArgs(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
             char option = argv[i][1];
