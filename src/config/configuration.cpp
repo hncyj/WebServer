@@ -10,7 +10,8 @@
 #include <cstring>
 #include <iostream>
 
-Configuration::Configuration() : PORT(8080), ASYNC_LOG_MODE(0), SQL_CONNECT_NUMS(8), THREAD_NUMS(8) {}
+Configuration::Configuration(int port = 8080, int db_connect_nums = 8, int thread_nums = 8, int async = 1)
+: PORT(port), DB_CONNECT_NUMS(db_connect_nums), THREAD_NUMS(thread_nums), ASYNC_MODE(async) {}
 
 void Configuration::parse_args(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
@@ -20,7 +21,7 @@ void Configuration::parse_args(int argc, char* argv[]) {
                 std::cout << "Usage: " << argv[0] << " [options]\n"
                           << "Options:\n"
                           << "  -p[:]<port>                Set the port number (default: 8080)\n"
-                          << "  -l[:]<async_log_mode>      Set the log write mode (0: async, 1: sync)\n"
+                          << "  -l[:]<async_log_mode>      Set the log write mode (0: sync, 1: async)\n"
                           << "  -c[:]<sql_connect_nums>    Set the number of SQL connections (default: 8)\n"
                           << "  -t[:]<thread_nums>         Set the number of threads (default: 8)\n"
                           << "  -h                         Show help\n";
@@ -44,10 +45,10 @@ void Configuration::parse_args(int argc, char* argv[]) {
                     PORT = std::atoi(value);
                     break;
                 case 'l':
-                    ASYNC_LOG_MODE = std::atoi(value);
+                    ASYNC_MODE = std::atoi(value);
                     break;
                 case 'c':
-                    SQL_CONNECT_NUMS = std::atoi(value);
+                    DB_CONNECT_NUMS = std::atoi(value);
                     break;
                 case 't':
                     THREAD_NUMS = std::atoi(value);
