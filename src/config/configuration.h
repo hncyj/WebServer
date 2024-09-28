@@ -4,8 +4,8 @@
  * @date 2024-09-01
  */
 
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef CONFIGURATION_H
+#define CONFIGURATION_H
 
 #include <iostream>
 
