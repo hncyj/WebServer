@@ -7,13 +7,18 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
-#include <vector>
-#include <cstring>
-#include <cassert>
+
 #include <unistd.h>
 #include <sys/uio.h>
 #include <stdarg.h>
+
+#include <vector>
+#include <cstring>
+#include <string>
+#include <cassert>
+#include <algorithm>
 #include <mutex>
+#include <shared_mutex>
 
 class Buffer {
 public:
@@ -21,14 +26,16 @@ public:
     ~Buffer() = default;
 
     size_t ReadableLen() const;                 // 缓冲区可读数据长度
-    size_t WritableLen() const;                 // 缓冲区可写数据长度
-    size_t PrependableLen() const;              // 缓冲区可复用长度 
 
-    char* ReadPtr() const;                      // 缓冲区可读数据起始指针
-    char* WritePtr() const;                     // 缓冲区可写位置起始指针
+    // TODO: 以下四个提供内部读写指针的函数存在多线程的风险。 原因在于，锁在调用该函数返回给相应对象后便被释放了，后续无法保证多线程的安全问题
+    char* ReadPtr();                            // 缓冲区可读位置起始指针
+    char* WritePtr();                           // 缓冲区可写位置起始指针
+    const char* ReadPtr() const;                // 缓冲区可读数据起始指针const版本
+    const char* WritePtr() const;               // 缓冲区可写位置起始指针const版本
+
     
     void ReadLen(size_t);                       // 读取缓冲区指定长度的数据
-    void ReadToPtr(const char*);                // 读取到指定指针位置中的数据
+    void ReadUntil(const char*);                // 读取到指定指针位置中的数据
     void ReadAll();                             // 读取缓冲区全部可读数据
     std::string ReadAllToStr();                 // 读取缓存区全部可读数据并转存为字符串
     
@@ -47,7 +54,7 @@ private:
     std::vector<char> buffer_;                  // 缓存区字符数组
     size_t readPos_;                            // 缓存区读取位置
     size_t writePos_;                           // 缓存区写入位置
-    mutable std::mutex buffer_mtx_;             // 缓存区互斥锁
+    mutable std::shared_mutex buffer_mtx_;      // 缓存区互斥锁
     
     char* BufferPtr();                          // 缓存区指针
     const char* BufferPtr() const;              // 缓存区指针常量

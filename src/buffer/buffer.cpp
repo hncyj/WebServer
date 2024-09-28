@@ -4,63 +4,67 @@
  * @date 2024-09-01 
  */
 
-#include <cassert>
-#include <string>
-
 #include "buffer.h"
 
-Buffer::Buffer(int init_size)
-    : buffer_(init_size), readPos_(0), writePos_(0) {}
+Buffer::Buffer(int init_size): buffer_(init_size), readPos_(0), writePos_(0) {}
 
 size_t Buffer::ReadableLen() const {
+    std::shared_lock<std::shared_mutex> locker(buffer_mtx_);
     return writePos_ - readPos_;
 }
 
-size_t Buffer::WritableLen() const {
-    return buffer_.size() - writePos_;
+char* Buffer::ReadPtr() {
+    std::shared_lock<std::shared_mutex> locker(buffer_mtx_);
+    return BufferPtr() + readPos_;
 }
 
-size_t Buffer::PrependableLen() const {
-    return readPos_;
+char* Buffer::WritePtr() {
+    std::shared_lock<std::shared_mutex> locker(buffer_mtx_);
+    return BufferPtr() + writePos_;
 }
 
-char* Buffer::ReadPtr() const {
-    return const_cast<char*>(BufferPtr() + readPos_);
+const char* Buffer::ReadPtr() const {
+    std::shared_lock<std::shared_mutex> locker(buffer_mtx_);
+    return BufferPtr() + readPos_;
 }
 
-char* Buffer::WritePtr() const {
-    return const_cast<char*>(BufferPtr() + writePos_);
+const char* Buffer::WritePtr() const {
+    std::shared_lock<std::shared_mutex> locker(buffer_mtx_);
+    return BufferPtr() + writePos_;
 }
 
 void Buffer::ReadLen(size_t len) {
-    assert(len <= ReadableLen());
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
+    assert(len <= writePos_ - readPos_);
     readPos_ += len;
 }
 
-void Buffer::ReadToPtr(const char* end) {
-  assert(ReadPtr() <= end);
-  ReadLen(end - ReadPtr());
+void Buffer::ReadUntil(const char* end) {
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
+    assert(buffer_.data() + writePos_ >= end);
+    readPos_ += (end - buffer_.data() - readPos_);
 }
 
 void Buffer::ReadAll() {
-    memset(buffer_.data(), 0, buffer_.size());
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
     readPos_ = 0;
     writePos_ = 0;
 }
 
 std::string Buffer::ReadAllToStr() {
-    std::lock_guard<std::mutex> lock(buffer_mtx_);
-    size_t readable_len = ReadableLen();
-    std::string str(ReadPtr(), readable_len);
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
+    assert(writePos_ >= readPos_);
+    size_t readable_len = writePos_ - readPos_;
+    std::string str(BufferPtr() + readPos_, readable_len);
     readPos_ += readable_len;
 
     return str;
 }
 
 void Buffer::Append(const char* data, size_t len) {
-    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
     EnsureWritable(len);
-    std::copy(data, data + len, WritePtr());
+    std::copy(data, data + len, BufferPtr() + writePos_);
     writePos_ += len;
 }
 
@@ -68,12 +72,13 @@ void Buffer::Append(const std::string& str) {
     Append(str.data(), str.size());
 }
 
-void Buffer::Append(const Buffer& buf) {
-    Append(buf.ReadPtr(), buf.ReadableLen());
+void Buffer::Append(const Buffer& buffer) {
+    Append(buffer.ReadPtr(), buffer.ReadableLen());
 }
 
 int Buffer::AppendFormatted(const char* format, va_list args) {
-    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
+
     va_list args_copy;
     va_copy(args_copy, args);
     int len = std::vsnprintf(nullptr, 0, format, args_copy);
@@ -85,7 +90,7 @@ int Buffer::AppendFormatted(const char* format, va_list args) {
     EnsureWritable(len + 1);
 
     va_copy(args_copy, args);
-    len = std::vsnprintf(WritePtr(), WritableLen(), format, args_copy);
+    len = std::vsnprintf(buffer_.data() + writePos_, buffer_.size() - writePos_, format, args_copy);
     va_end(args_copy);
 
     if (len > 0) {
@@ -96,10 +101,11 @@ int Buffer::AppendFormatted(const char* format, va_list args) {
 }
 
 ssize_t Buffer::ReadFromFd(int fd, int* saveErrno) {
-    std::lock_guard<std::mutex> lock(buffer_mtx_);
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
     char buff[65535];
     struct iovec iov[2];
-    size_t write_size = WritableLen();
+
+    size_t write_size = buffer_.size() - writePos_;
     iov[0].iov_base = BufferPtr() + writePos_;
     iov[0].iov_len = write_size;
     iov[1].iov_base = buff;
@@ -122,8 +128,10 @@ ssize_t Buffer::ReadFromFd(int fd, int* saveErrno) {
 }
 
 ssize_t Buffer::WriteToFd(int fd, int* saveErrno) {
-    std::lock_guard<std::mutex> lock(buffer_mtx_);
-    size_t read_size = ReadableLen();
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
+
+    assert(writePos_ >= readPos_);
+    size_t read_size = writePos_ - readPos_;
 
     ssize_t len = write(fd, ReadPtr(), read_size);
     if (len < 0) {
@@ -135,6 +143,13 @@ ssize_t Buffer::WriteToFd(int fd, int* saveErrno) {
     return len;
 }
 
+void Buffer::Clear() {
+    std::unique_lock<std::shared_mutex> locker(buffer_mtx_);
+    buffer_.clear();
+    readPos_ = 0;
+    writePos_ = 0;
+}
+
 char* Buffer::BufferPtr() {
     return buffer_.data();
 }
@@ -144,17 +159,17 @@ const char* Buffer::BufferPtr() const {
 }
 
 void Buffer::ExpandBuffer(size_t len) {
-    if (WritableLen() + readPos_ < len) {
+    if (buffer_.size() - writePos_ + readPos_ < len) {
         buffer_.resize(writePos_ + len + 1);
     } else {
+        size_t readable = writePos_ - readPos_;
         std::copy(BufferPtr() + readPos_, BufferPtr() + writePos_, BufferPtr());
         readPos_ = 0;
-        writePos_ = ReadableLen();
+        writePos_ = readable;
     }
 }
 
 void Buffer::EnsureWritable(size_t len) {
-    if (WritableLen() < len) {
-        ExpandBuffer(len);
-    }
+    if (buffer_.size() - writePos_ >= len) return;
+    ExpandBuffer(len);
 }
