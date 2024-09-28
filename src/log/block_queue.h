@@ -4,44 +4,46 @@
  * @date 2024-09-02
  */
 
-#ifndef BLOCK_QUEUE_H_
-#define BLOCK_QUEUE_H_
+#ifndef BLOCK_QUEUE_H
+#define BLOCK_QUEUE_H
 
 #include <deque>
 #include <mutex>
 #include <condition_variable>
 
 /**
- * @brief 单一消费者，多生产者的阻塞双端队列
+ * @brief 
+ * 单消费者-多生产者模型
+ * 异步日志模式下打开
  */
 
 template <typename T>
 class BlockDeque {
 public:
-    explicit BlockDeque(size_t max_capacity = 1024);
+    explicit BlockDeque(size_t max_capacity = 1024); 
     ~BlockDeque();
 
     // void clear();
-    void close();
+    void Close();
 
-    bool isEmpty() const noexcept;
-    bool isFull() const noexcept;
+    bool IsEmpty() const noexcept;
+    bool IsFull() const noexcept;
 
-    size_t getSize() const noexcept;
-    size_t getCapacity() const noexcept;
+    size_t GetDequeSize() const noexcept;
+    size_t GetDequeCapacity() const noexcept;
 
-    bool getFrontElement(T&);
-    bool getLastElement(T&);
+    bool GetFrontElement(T&);
+    bool GetLastElement(T&);
 
-    bool pushFront(T&&);
-    bool pushFront(const T&);
-    bool pushBack(T&&);
-    bool pushBack(const T&);
+    bool PushFront(T&&);
+    bool PushFront(const T&);
+    bool PushBack(T&&);
+    bool PushBack(const T&);
     
-    bool popFront(T&);
-    bool popFront(T&, int);  // 超时版本
+    bool PopFront(T&);
+    bool PopFront(T&, int);  // 超时版本
     
-    void flush();
+    void Flush();
 
 private:
     std::deque<T> block_deque_;
@@ -55,14 +57,14 @@ private:
 template <typename T>
 BlockDeque<T>::BlockDeque(size_t max_capacity)
     : deque_capacity_(max_capacity), is_deque_open_(true) {
-        if (deque_capacity_ == 0) {
-            throw std::invalid_argument("Block Queue's capacity must be greater than zero.");
-        }
+    if (deque_capacity_ <= 0) {
+        throw std::invalid_argument("BlockQueue's capacity must be greater than zero.");
     }
+}
 
 template <typename T>
 BlockDeque<T>::~BlockDeque() {
-    close();
+    Close();
 }
 
 // template <typename T>
@@ -74,40 +76,41 @@ BlockDeque<T>::~BlockDeque() {
 // }
 
 template <typename T>
-void BlockDeque<T>::close() {
+void BlockDeque<T>::Close() {
     {
         std::lock_guard<std::mutex> locker(deque_mtx_);
         is_deque_open_ = false;
     }
+    // TODO: 思考通知生产者和消费者的消费顺序是否会有影响
     consumer_con_var_.notify_one();
     producer_con_var_.notify_all();
 }
 
 template <typename T>
-bool BlockDeque<T>::isEmpty() const noexcept {
+bool BlockDeque<T>::IsEmpty() const noexcept {
     std::lock_guard<std::mutex> locker(deque_mtx_);
     return block_deque_.empty();
 }
 
 template <typename T>
-bool BlockDeque<T>::isFull() const noexcept {
+bool BlockDeque<T>::IsFull() const noexcept {
     std::lock_guard<std::mutex> locker(deque_mtx_);
     return block_deque_.size() >= deque_capacity_;
 }
 
 template <typename T>
-size_t BlockDeque<T>::getSize() const noexcept {
+size_t BlockDeque<T>::GetDequeSize() const noexcept {
     std::lock_guard<std::mutex> locker(deque_mtx_);
     return block_deque_.size();
 }
 
 template <typename T>
-size_t BlockDeque<T>::getCapacity() const noexcept {
+size_t BlockDeque<T>::GetDequeCapacity() const noexcept {
     return deque_capacity_;
 }
 
 template <typename T>
-bool BlockDeque<T>::getFrontElement(T& element) {
+bool BlockDeque<T>::GetFrontElement(T& element) {
     std::lock_guard<std::mutex> locker(deque_mtx_);
     if (block_deque_.empty()) return false;
     element = block_deque_.front();
@@ -115,7 +118,7 @@ bool BlockDeque<T>::getFrontElement(T& element) {
 }
 
 template <typename T>
-bool BlockDeque<T>::getLastElement(T& element) {
+bool BlockDeque<T>::GetLastElement(T& element) {
     std::lock_guard<std::mutex> locker(deque_mtx_);
     if (block_deque_.empty()) return false;
     element = block_deque_.back();
@@ -123,65 +126,60 @@ bool BlockDeque<T>::getLastElement(T& element) {
 }
 
 template <typename T>
-bool BlockDeque<T>::pushFront(T&& element) {
+bool BlockDeque<T>::PushFront(T&& element) {
     std::unique_lock<std::mutex> locker(deque_mtx_);
-    producer_con_var_.wait(locker, [this]() {return block_deque_.size() < deque_capacity_ || !is_deque_open_;});
+    producer_con_var_.wait(locker, [this]() {
+        return block_deque_.size() < deque_capacity_ || !is_deque_open_;
+    });
     if (!is_deque_open_) return false;
-    try {
-        block_deque_.push_front(std::move(element));
-    } catch (...) {
-        throw;
-    }
+    block_deque_.push_front(std::forward<T>(element));
+    consumer_con_var_.notify_one();
+
+    return true;
+}
+
+template <typename T>
+bool BlockDeque<T>::PushFront(const T& element) {
+    std::unique_lock<std::mutex> locker(deque_mtx_);
+    producer_con_var_.wait(locker, [this] {
+        return block_deque_.size() < deque_capacity_ || !is_deque_open_;
+    });
+    if (!is_deque_open_) return false;
+    block_deque_.push_front(element);
     consumer_con_var_.notify_one();
     return true;
 }
 
 template <typename T>
-bool BlockDeque<T>::pushFront(const T& element) {
+bool BlockDeque<T>::PushBack(T&& element) {
     std::unique_lock<std::mutex> locker(deque_mtx_);
-    producer_con_var_.wait(locker, [this] {return block_deque_.size() < deque_capacity_ || !is_deque_open_;});
+    producer_con_var_.wait(locker, [this]() {
+        return block_deque_.size() < deque_capacity_ || !is_deque_open_;
+    });
     if (!is_deque_open_) return false;
-    try {
-        block_deque_.push_front(element);
-    } catch (...) { // 偷个懒，可能存在内存申请失败的问题
-        throw;
-    }
+    block_deque_.push_back(std::forward<T>(element));
     consumer_con_var_.notify_one();
     return true;
 }
 
 template <typename T>
-bool BlockDeque<T>::pushBack(T&& element) {
+bool BlockDeque<T>::PushBack(const T& element) {
     std::unique_lock<std::mutex> locker(deque_mtx_);
-    producer_con_var_.wait(locker, [this]() {return block_deque_.size() < deque_capacity_ || !is_deque_open_;});
+    producer_con_var_.wait(locker, [this] {
+        return block_deque_.size() < deque_capacity_ || !is_deque_open_;
+    });
     if (!is_deque_open_) return false;
-    try {
-        block_deque_.push_back(std::move(element));
-    } catch (...) {
-        throw;
-    }
+    block_deque_.push_back(element);
     consumer_con_var_.notify_one();
     return true;
 }
 
 template <typename T>
-bool BlockDeque<T>::pushBack(const T& element) {
+bool BlockDeque<T>::PopFront(T& element) {
     std::unique_lock<std::mutex> locker(deque_mtx_);
-    producer_con_var_.wait(locker, [this] {return block_deque_.size() < deque_capacity_ || !is_deque_open_;});
-    if (!is_deque_open_) return false;
-    try {
-        block_deque_.push_back(element);
-    } catch (...) {
-        throw;
-    }
-    consumer_con_var_.notify_one();
-    return true;
-}
-
-template <typename T>
-bool BlockDeque<T>::popFront(T& element) {
-    std::unique_lock<std::mutex> locker(deque_mtx_);
-    consumer_con_var_.wait(locker, [this] {return !block_deque_.empty() || !is_deque_open_;});
+    consumer_con_var_.wait(locker, [this] {
+        return !block_deque_.empty() || !is_deque_open_;
+    });
     if (block_deque_.empty()) return false;
     element = std::move(block_deque_.front());
     block_deque_.pop_front();
@@ -190,7 +188,7 @@ bool BlockDeque<T>::popFront(T& element) {
 }
 
 template <typename T>
-bool BlockDeque<T>::popFront(T& element, int timeout) {
+bool BlockDeque<T>::PopFront(T& element, int timeout) {
     auto secs = std::chrono::seconds(timeout);
     std::unique_lock<std::mutex> locker(deque_mtx_);
     if (!consumer_con_var_.wait_for(locker, secs, [this] {return !block_deque_.empty() || !is_deque_open_;})) {
@@ -204,7 +202,7 @@ bool BlockDeque<T>::popFront(T& element, int timeout) {
 }
 
 template <typename T>
-void BlockDeque<T>::flush() {
+void BlockDeque<T>::Flush() {
     consumer_con_var_.notify_one();
 }
 
