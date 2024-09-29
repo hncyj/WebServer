@@ -9,7 +9,7 @@
 #include <gtest/gtest.h>
 
 // Test default constructor values
-TEST(ConfigurationTest, DefaultConstructor) {
+TEST(TestConfiguration, DefaultConstructor) {
     Configuration config;
     EXPECT_EQ(config.PORT, 8080);
     EXPECT_EQ(config.DB_CONNECT_NUMS, 8);
@@ -18,7 +18,7 @@ TEST(ConfigurationTest, DefaultConstructor) {
 }
 
 // Test argument parsing
-TEST(ConfigurationTest, ParseArgsValid) {
+TEST(TestConfiguration, ParseArgsValid) {
     char* argv[] = {
         (char*)"server", 
         (char*)"-p", (char*)"9090", 
