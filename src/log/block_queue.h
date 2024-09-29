@@ -81,9 +81,8 @@ void BlockDeque<T>::Close() {
         std::lock_guard<std::mutex> locker(deque_mtx_);
         is_deque_open_ = false;
     }
-    // TODO: 思考通知生产者和消费者的消费顺序是否会有影响
-    consumer_con_var_.notify_one();
     producer_con_var_.notify_all();
+    consumer_con_var_.notify_all();
 }
 
 template <typename T>
