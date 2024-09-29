@@ -180,7 +180,7 @@ bool BlockDeque<T>::PopFront(T& element) {
     consumer_con_var_.wait(locker, [this] {
         return !block_deque_.empty() || !is_deque_open_;
     });
-    if (block_deque_.empty()) return false;
+    if (block_deque_.empty() && !is_deque_open_) return false;
     element = std::move(block_deque_.front());
     block_deque_.pop_front();
     producer_con_var_.notify_one();
@@ -194,7 +194,7 @@ bool BlockDeque<T>::PopFront(T& element, int timeout) {
     if (!consumer_con_var_.wait_for(locker, secs, [this] {return !block_deque_.empty() || !is_deque_open_;})) {
         return false;
     }
-    if (block_deque_.empty()) return false;
+    if (block_deque_.empty() && !is_deque_open_) return false;
     element = std::move(block_deque_.front());
     block_deque_.pop_front();
     producer_con_var_.notify_one();
