@@ -8,6 +8,8 @@
 #define CONFIGURATION_H
 
 #include <iostream>
+#include <cstdlib>
+#include <cstring>
 
 class Configuration {
 public:
