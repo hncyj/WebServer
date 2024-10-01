@@ -8,7 +8,7 @@
 
 TimerHeap::TimerHeap() {
     timer_heap_.reserve(64);
-    LOG_INFO("Init timer heap.");
+    LOG_INFO("Timer: Init Timer Heap Success.");
 }
 
 TimerHeap::~TimerHeap() {
@@ -17,7 +17,7 @@ TimerHeap::~TimerHeap() {
 
 void TimerHeap::AddTimer(int id, int timeout, const TimeoutCallBackFunc& cb_f) {
     if (id_maps_.contains(id)) {
-        LOG_ERROR("Timer with id: %d already exists!", id);
+        LOG_ERROR("Add Timer Failed: Timer With id: %d Already Exists.", id);
         return;
     } 
     TimeStamp exipres = Clock::now() + MS(timeout);
@@ -28,7 +28,7 @@ void TimerHeap::AddTimer(int id, int timeout, const TimeoutCallBackFunc& cb_f) {
 
 void TimerHeap::UpdateTimer(int id, int new_expire) {
     if (!id_maps_.contains(id)) {
-        LOG_ERROR("Timer with id: %d not found!", id);
+        LOG_ERROR("Update Timer Failed: Timer With id: %d Not Exists.", id);
         return;
     }
     int idx = id_maps_[id];
@@ -44,7 +44,7 @@ void TimerHeap::UpdateTimer(int id, int new_expire) {
 
 void TimerHeap::CBWorker(int id) {
     if (timer_heap_.empty() || !id_maps_.contains(id)) {
-        LOG_WARN("CallBack Worker called invalid");
+        LOG_WARN("Timer CallBack Worker Failed: CallBack Worker Called Invalid.");
         return;
     }
     size_t idx = id_maps_[id];
@@ -70,7 +70,7 @@ void TimerHeap::CleanExpiredTimer() {
 
 void TimerHeap::RemoveTopTimer() {
     if (timer_heap_.empty()) {
-        LOG_ERROR("Attempted to remove top timer, but timer heap is empty.");
+        LOG_ERROR("Timer: Attempted To Temove Top Timer, But Timer Heap is Empty.");
         return;
     }
     RemoveTimer(0);
@@ -87,7 +87,7 @@ int TimerHeap::GetNextExpireTime() {
 void TimerHeap::RemoveTimer(size_t idx) {
     // 删除指定堆索引的timer
     if (idx >= timer_heap_.size()) {
-        LOG_ERROR("Attempt to remove invalid heap idx.");
+        LOG_ERROR("Timer: Attempt To Remove Invalid Timer Heap idx.");
         return;
     }
     size_t last_idx = timer_heap_.size() - 1;
