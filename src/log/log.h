@@ -57,7 +57,7 @@ private:
 
     std::mutex log_mtx_;                                         // 日志文件互斥锁
 
-    std::string log_file_path_;                                  // 日志文件存储路径            
+    std::filesystem::path log_file_path_;                        // 日志文件存储路径            
     std::string log_file_name_;                                  // 日志文件名
     
     int today_;                                                  // 记录日志系统时间，用于日志轮换

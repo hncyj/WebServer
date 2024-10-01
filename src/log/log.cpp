@@ -45,7 +45,7 @@ void Log::AsyncWriteLog() {
 }
 
 bool Log::Init(int max_lines, bool is_async, int max_queue_size, int file_expire) {
-    log_file_path_ = std::filesystem::absolute("../logfiles").string();
+    log_file_path_ = std::filesystem::current_path() / "logfiles";
     log_file_name_ = "logfile";
     max_lines_ = max_lines;
     is_async_log_ = is_async;
@@ -109,8 +109,7 @@ void Log::BuildLogFile(std::tm cur_tm) {
                                         cur_tm.tm_mday,
                                         cnt_lines_ / max_lines_ + 1
                                         );
-        std::filesystem::path file_path = log_file_path_;
-        file_path /= new_log_file_name;
+        std::filesystem::path file_path = log_file_path_ / new_log_file_name;
         log_file_stream_.open(file_path, std::ios::out | std::ios::app);
     }
 }
@@ -131,7 +130,8 @@ std::string Log::GetLogPrefix() {
                        cur_tm.tm_mday, 
                        cur_tm.tm_hour, 
                        cur_tm.tm_min, 
-                       cur_tm.tm_sec);
+                       cur_tm.tm_sec
+                    );
 }
 
 std::string Log::FormatString(const char* format, va_list args) {

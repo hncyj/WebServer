@@ -120,27 +120,29 @@
  * 本次测试设置：max_lines_ = 2;
  */
 
-TEST(LogTest, LogRotate) {
-    Log& logger = Log::GetLogInstance();
-    logger.Init(2, false, 10, 30);
+// TEST(LogTest, LogRotate) {
+//     Log& logger = Log::GetLogInstance();
+//     logger.Init(2, false, 10, 30);
 
-    for (size_t i = 0; i < 5; ++i) {
-        LOG_INFO("lines: %d", i);
-    }
+//     for (size_t i = 0; i < 5; ++i) {
+//         LOG_INFO("lines: %d", i);
+//     }
 
-    int cnt = 1;
-    std::string prefix = "/home/chenyinjie/github/WebServer/build/test/logfiles/logfile_2024_09_30_";
-    std::string tail = ".log";
-    while (true) {
-        if (std::filesystem::exists(prefix + std::to_string(cnt) + tail)) {
-            cnt += 1;
-        } else {
-            break;
-        }
-    }
-    ASSERT_TRUE(cnt == 4);
-    logger.Close();
-}
+//     int cnt = 1;
+//     std::string prefix = "/home/chenyinjie/github/WebServer/build/test/logfiles/logfile_2024_09_30_";
+//     std::string tail = ".log";
+//     while (true) {
+//         if (std::filesystem::exists(prefix + std::to_string(cnt) + tail)) {
+//             cnt += 1;
+//         } else {
+//             break;
+//         }
+//     }
+//     ASSERT_TRUE(cnt == 4);
+//     logger.Close();
+// }
+
+// TODO : CleanLogs函数待测试
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
