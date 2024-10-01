@@ -8,20 +8,16 @@
 
 TimerHeap::TimerHeap() {
     timer_heap_.reserve(64);
-    is_log_open = Log::getInstance().isOpen();
+    LOG_INFO("Init timer heap.");
 }
 
 TimerHeap::~TimerHeap() {
     ClearAllTimers();
 }
 
-void TimerHeap::AddTimer(int id, int timeout, const TimeoutCallBack& cb_f) {
+void TimerHeap::AddTimer(int id, int timeout, const TimeoutCallBackFunc& cb_f) {
     if (id_maps_.contains(id)) {
-        if (is_log_open) {
-            LOG_ERROR("Timer with id: %d already exists!", id);
-        } else {
-            std::cerr << "Timer with id: " << id << " already exists!" << std::endl;
-        }
+        LOG_ERROR("Timer with id: %d already exists!", id);
         return;
     } 
     TimeStamp exipres = Clock::now() + MS(timeout);
@@ -30,39 +26,30 @@ void TimerHeap::AddTimer(int id, int timeout, const TimeoutCallBack& cb_f) {
     HeapifyUp(timer_heap_.size() - 1);
 }
 
-void TimerHeap::UpdateTimer(int id, int new_period) {
+void TimerHeap::UpdateTimer(int id, int new_expire) {
     if (!id_maps_.contains(id)) {
-        if (is_log_open) {
-            LOG_ERROR("Timer with id: %d not found!", id);
-        } else {
-            std::cerr << "Timer with id: " << id << " not found!" << std::endl;
-        }
+        LOG_ERROR("Timer with id: %d not found!", id);
         return;
     }
     int idx = id_maps_[id];
-    TimeStamp old_expires = timer_heap_[idx].expires_;
+    TimeStamp old_expires = timer_heap_[idx]._expire;
     // 更新到期时间
-    timer_heap_[idx].expires_ = Clock::now() + MS(new_period);
-    if (timer_heap_[idx].expires_ > old_expires) {
-        // 时间延长
+    timer_heap_[idx]._expire = Clock::now() + MS(new_expire);
+    if (timer_heap_[idx]._expire > old_expires) {
         HeapifyDown(idx, timer_heap_.size());
     } else {
         HeapifyUp(idx);
     }
 }
 
-void TimerHeap::Worker(int id) {
+void TimerHeap::CBWorker(int id) {
     if (timer_heap_.empty() || !id_maps_.contains(id)) {
-        if (is_log_open) {
-            LOG_WARN("Worker called invalid");
-        } else {
-            std::cerr << "Worker called invalid" << std::endl;
-        }
+        LOG_WARN("CallBack Worker called invalid");
         return;
     }
     size_t idx = id_maps_[id];
     Timer timer = timer_heap_[idx];
-    timer.callback_f_();
+    timer._callback_func();
     RemoveTimer(idx);
 }
 
@@ -75,28 +62,24 @@ void TimerHeap::CleanExpiredTimer() {
     if (timer_heap_.empty()) return;
     while (!timer_heap_.empty()) {
         Timer timer = timer_heap_.front();
-        if (std::chrono::duration_cast<MS>(timer.expires_ - Clock::now()).count() > 0) break;
-        timer.callback_f_();
+        if (std::chrono::duration_cast<MS>(timer._expire - Clock::now()).count() > 0) break;
+        timer._callback_func();
         RemoveTopTimer();
     }
 }
 
 void TimerHeap::RemoveTopTimer() {
     if (timer_heap_.empty()) {
-        if (is_log_open) {
-            LOG_ERROR("Attempted to remove top timer, but timer heap is empty.");
-        } else {
-            std::cerr << "Attempted to remove top timer, but timer heap is empty." << std::endl;
-        }
+        LOG_ERROR("Attempted to remove top timer, but timer heap is empty.");
         return;
     }
     RemoveTimer(0);
 }
 
-int TimerHeap::GetNextTimerExpireTime() {
+int TimerHeap::GetNextExpireTime() {
     CleanExpiredTimer();
     if (timer_heap_.empty()) return -1;
-    int t = std::chrono::duration_cast<MS>(timer_heap_.front().expires_ - Clock::now()).count();
+    int t = std::chrono::duration_cast<MS>(timer_heap_.front()._expire - Clock::now()).count();
 
     return t < 0 ? 0 : t;
 }
@@ -104,33 +87,29 @@ int TimerHeap::GetNextTimerExpireTime() {
 void TimerHeap::RemoveTimer(size_t idx) {
     // 删除指定堆索引的timer
     if (idx >= timer_heap_.size()) {
-        if (is_log_open) {
-            LOG_ERROR("Remove idx invalid.");
-        } else {
-            std::cerr << "Remove idx invalid." << std::endl;
-        }
+        LOG_ERROR("Attempt to remove invalid heap idx.");
         return;
     }
     size_t last_idx = timer_heap_.size() - 1;
+    SwapTimers(idx, last_idx);
+    id_maps_.erase(timer_heap_[last_idx]._id);
+    timer_heap_.pop_back();
     if (idx < last_idx) {
-        SwapTimers(idx, last_idx);
-        id_maps_.erase(timer_heap_[last_idx].id_);
-        timer_heap_.pop_back();
-        HeapifyDown(idx, timer_heap_.size());
-    } else {
-        id_maps_.erase(timer_heap_[last_idx].id_);
-        timer_heap_.pop_back();
+        if (idx > 0 && (timer_heap_[idx]._expire < timer_heap_[(idx - 1) / 2]._expire)) {
+            HeapifyUp(idx);
+        } else {
+            HeapifyDown(idx, timer_heap_.size());
+        }
     }
 }
 
 void TimerHeap::HeapifyUp(size_t idx) {
-  while (idx > 0) {
-    size_t parent = (idx - 1) / 2;
-    if (timer_heap_[parent].expires_ <= timer_heap_[idx].expires_)
-      break;
-    SwapTimers(parent, idx);
-    idx = parent;
-  }
+    while (idx > 0) {
+        size_t parent = (idx - 1) / 2;
+        if (timer_heap_[parent]._expire <= timer_heap_[idx]._expire) break;
+        SwapTimers(parent, idx);
+        idx = parent;
+    }
 }
 
 void TimerHeap::HeapifyDown(size_t idx, size_t n) {
@@ -138,8 +117,8 @@ void TimerHeap::HeapifyDown(size_t idx, size_t n) {
         size_t min_idx = idx;
         size_t left = 2 * idx + 1;
         size_t right = 2 * idx + 2;
-        if (left < n && timer_heap_[left].expires_ < timer_heap_[min_idx].expires_) min_idx = left;
-        if (right < n && timer_heap_[right].expires_ < timer_heap_[min_idx].expires_) min_idx = right;
+        if (left < n && timer_heap_[left]._expire < timer_heap_[min_idx]._expire) min_idx = left;
+        if (right < n && timer_heap_[right]._expire < timer_heap_[min_idx]._expire) min_idx = right;
         if (min_idx == idx) break; 
         SwapTimers(idx, min_idx);
         idx = min_idx;
@@ -150,6 +129,6 @@ void TimerHeap::SwapTimers(size_t i, size_t j) {
     // 交换对应索引下的两个Timer
     std::swap(timer_heap_[i], timer_heap_[j]);
     // 更新映射关系
-    id_maps_[timer_heap_[i].id_] = i;
-    id_maps_[timer_heap_[j].id_] = j;
+    id_maps_[timer_heap_[i]._id] = i;
+    id_maps_[timer_heap_[j]._id] = j;
 }
