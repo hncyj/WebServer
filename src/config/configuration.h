@@ -1,7 +1,8 @@
 /**
- * @file config.h
+ * @file configuration.h
  * @author chenyinjie
  * @date 2024-09-01
+ * @copyright Apache 2.0
  */
 
 #ifndef CONFIGURATION_H

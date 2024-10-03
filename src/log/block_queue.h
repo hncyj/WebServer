@@ -2,6 +2,7 @@
  * @file block_queue.h
  * @author chenyinjie
  * @date 2024-09-02
+ * @copyright Apache 2.0
  */
 
 #ifndef BLOCK_QUEUE_H

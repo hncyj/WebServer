@@ -2,6 +2,7 @@
  * @file epoll.cpp
  * @author chenyinjie
  * @date 2024-09-12
+ * @copyright Apache 2.0
  */
 
 #include "epoll.h"

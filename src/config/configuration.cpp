@@ -1,7 +1,8 @@
 /**
- * @file config.cpp
+ * @file configuration.cpp
  * @author chenyinjie
  * @date 2024-09-01
+ * @copyright Apache 2.0
  */
 
 #include "configuration.h"

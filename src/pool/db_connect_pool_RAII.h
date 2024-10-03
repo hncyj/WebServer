@@ -2,6 +2,7 @@
  * @file db_connect_pool_RAII.h
  * @author chenyinjie
  * @date 2024-09-11
+ * @copyright Apache 2.0
  */
 
 #ifndef DB_CONNECT_POOL_RAII_H

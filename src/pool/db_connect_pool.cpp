@@ -2,6 +2,7 @@
  * @file db_connect_pool.cpp
  * @author chenyinjie
  * @date 2024-09-11
+ * @copyright Apache 2.0
  */
 
 #include "db_connect_pool.h"
