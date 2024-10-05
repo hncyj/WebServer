@@ -12,6 +12,7 @@ Linux环境下C++实现的轻量级WebServer。
   - [线程池\&连接池模块](#线程池连接池模块)
   - [HTTP模块](#http模块)
   - [服务器模块](#服务器模块)
+  - [致谢](#致谢)
 
 ## 环境配置
 
@@ -106,5 +107,32 @@ Linux环境下C++实现的轻量级WebServer。
 
 ## HTTP模块
 
+该模块共由三部分组成：[HTTP请求报文解析模块](/src/http/http_request.h)、[HTTP响应报文生成模块](/src/http/http_response.h)、[HTTP连接模块](/src/http/http_connect.h)。
+
+**HTTP请求报文解析模块**
+
+- `HTTPRequest`类负责解析 HTTP 请求报文。
+- 它通过从缓冲区中读取 HTTP 请求，解析请求的各个部分，包括请求行、首部行和请求体，并处理相应的状态与数据。
+- 该类支持 `GET` 和 `POST` 请求，并能对 POST 请求中的 URL 编码数据进行解析。
+
+<br>
+
+**HTTP响应报文生成模块**
+
+- `HTTPResponse`类负责生成 HTTP 响应报文。
+- `Init()` 方法初始化响应所需的资源路径、请求路径、连接是否保持以及状态码。
+- `GenerateResponse()` 方法根据请求的资源生成 HTTP 响应，包括状态行、头部和内容部分，最终写入到一个 `Buffer` 对象中。
+- 通过 `mmap` 将请求的文件映射到内存中，并提供 `UnmapFilePtr()` 方法解除映射。
+- 当请求的资源不存在或无法访问时，通过 `ErrorContent()` 和 `ErrorHtml()` 方法生成错误页面内容，并返回适当的 HTTP 状态码。
+
+<br>
+
+**HTTP连接模块**
+
+
+
+
 
 ## 服务器模块
+
+## 致谢
