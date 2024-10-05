@@ -2,6 +2,7 @@
  * @file buffer.cpp
  * @author chenyinjie
  * @date 2024-09-01 
+ * @copyright Apache 2.0
  */
 
 #include "buffer.h"

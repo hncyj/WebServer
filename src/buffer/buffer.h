@@ -2,6 +2,7 @@
  * @file buffer.h
  * @author chenyinjie
  * @date 2024-09-01
+ * @copyright Apache 2.0
  */
 
 #ifndef BUFFER_H
@@ -27,7 +28,13 @@ public:
 
     size_t ReadableLen() const;                 // 缓冲区可读数据长度
 
-    // TODO: 以下四个提供内部读写指针的函数存在多线程的风险。 原因在于，锁在调用该函数返回给相应对象后便被释放了，后续无法保证多线程的安全问题
+    /**
+     * TODO:
+     * 以下四个提供内部读写指针的函数存在多线程的风险。
+     * 原因在于，buffer数组锁在调用buffer的成员函数获取指针或索引后便被释放了，无法保证多线程下的安全问题。
+     * 明确后续调用位置后再修改。
+    */
+   
     char* ReadPtr();                            // 缓冲区可读位置起始指针
     char* WritePtr();                           // 缓冲区可写位置起始指针
     const char* ReadPtr() const;                // 缓冲区可读数据起始指针const版本
