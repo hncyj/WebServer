@@ -111,7 +111,7 @@ std::string HTTPRequest::GetPost(const char* key) const {
 }
 
 bool HTTPRequest::IsKeepAlive() const {
-    return headers_.count("Connection") && headers_.find("Connection")->second == "Keep-alive" && version_ == "1.1";
+    return headers_.count("Connection") && headers_.find("Connection")->second == "keep-alive" && version_ == "1.1";
 }
 
 bool HTTPRequest::ParseRequestLine(const std::string& line) {

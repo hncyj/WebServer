@@ -2,6 +2,7 @@
  * @file http_response.h
  * @author chenyinjie
  * @date 2024-09-22
+ * @copyright Apache 2.0
  */
 
 #ifndef HTTP_RESPONSE_H
@@ -24,37 +25,33 @@ public:
     HTTPResponse();
     ~HTTPResponse();
 
-    void Init(const std::string& src_dir, std::string& path, bool is_keep_alive = false, int code = -1);
+    void Init(const std::string& src_dir, const std::string& path, bool is_keep_alive = false, int code = -1);
     void GenerateResponse(Buffer& buffer);
-    void UnmapMemoryFilePtr();
-    char* GetMapFilePtr();
+    void UnmapFilePtr();
+    char* GetFilePtr();
     size_t GetFileLen() const;
     void ErrorContent(Buffer& buffer, std::string message);
-    int Code() const;
+    int GetCode() const;
 
 private:
+    void ErrorHtml();
     void AddStateLine(Buffer &buffer);
     void AddHeader(Buffer &buffer);
     void AddContent(Buffer &buffer);
 
-    void ErrorHtml();
     std::string GetFileType();
-    std::string GetCurDateTime();
+    std::string GetCurrentTime();
 
-    int code_;
-    bool is_keep_alive_;
+    int code_;                                                               // 响应状态吗
+    bool is_keep_alive_;                                                     // 是否保持连接
+    std::string path_;                                                       // 请求资源路径
+    std::string src_dir_;                                                    // 资源存储目录
+    char* mmfile_ptr_;                                                       // 内存映射文件指针
+    struct stat mmfile_stat_;                                                // 文件信息结构
 
-    std::string path_;
-    std::string src_dir_;
-    
-    char* mapped_file_ptr_; 
-    struct stat mapped_file_stat_;
-
-    bool is_log_open_;
-
-    static const std::unordered_map<std::string, std::string> SUFFIX_TYPE;
-    static const std::unordered_map<int, std::string> CODE_STATUS;
-    static const std::unordered_map<int, std::string> CODE_PATH;
+    static const std::unordered_map<std::string, std::string> SUFFIX_TYPE_;  // 类型后缀映射
+    static const std::unordered_map<int, std::string> CODE_STATUS_;          // 状态码映射
+    static const std::unordered_map<int, std::string> CODE_PATH_;            // 错误页面路径
 };
 
 #endif
