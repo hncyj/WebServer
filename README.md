@@ -35,7 +35,7 @@ Linux环境下C++实现的轻量级WebServer。
 - -p: 设置服务器端口号，默认值为 8080。
 - -c: 设置数据库连接池的连接数量，默认值为 8。
 - -t: 设置线程池的线程数量，默认值为 8。
-- -l: 设置日志写入模式，0 为异步，1 为同步，默认值为 0。
+- -l: 设置日志写入模式，0 为同步，1 为异步，默认值为 0。
 - -h: 显示帮助信息。
 
 **支持多种输入参数格式解析：**
@@ -104,9 +104,6 @@ Linux环境下C++实现的轻量级WebServer。
 - 该设计防止连接泄露并确保异常情况下的安全性。
 
 
-
-
-
 ## HTTP模块
 
 该模块共由三部分组成：[HTTP请求报文解析模块](/src/http/http_request.h)、[HTTP响应报文生成模块](/src/http/http_response.h)、[HTTP连接模块](/src/http/http_connect.h)。
@@ -137,4 +134,10 @@ Linux环境下C++实现的轻量级WebServer。
 
 ## 服务器模块
 
+- [WebServer](/src/server/server.h) 类是一个核心模块，用于构建高性能的多线程 HTTP 服务器。
+- 它管理套接字连接，处理 HTTP 请求和响应，并通过连接池与 MySQL 数据库交互。
+- 服务器使用 epoll 实现高效的 I/O 多路复用，并支持同步与异步日志记录。
+
 ## 致谢
+
+本项目[素材](/resources/)来自[WebServer](https://github.com/markparticle/WebServer/tree/master).
