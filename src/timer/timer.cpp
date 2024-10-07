@@ -9,7 +9,7 @@
 
 TimerHeap::TimerHeap() {
     timer_heap_.reserve(64);
-    LOG_INFO("Timer: Init Timer Heap Success.");
+    LOG_INFO("Timer Heap: Init Timer Heap Success.");
 }
 
 TimerHeap::~TimerHeap() {
