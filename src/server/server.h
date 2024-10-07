@@ -2,6 +2,7 @@
  * @file server.h
  * @author chenyinjie
  * @date 2024-09-24
+ * @copyright Apache 2.0
  */
 
 #ifndef SERVER_H
@@ -12,22 +13,24 @@
 #include "../epoll/epoll.h"
 #include "../pool/thread_pool.h"
 #include "../http/http_connect.h"
-#include "../pool/sql_connect_pool.h"
-#include "../pool/sql_connect_pool_RAII.h"
+#include "../pool/db_connect_pool.h"
+#include "../pool/db_connect_pool_RAII.h"
 
 class WebServer {
 public:
-    WebServer(int port, int triggerMode, bool is_linger, int sql_port,
-              const char* sql_user, const char* sql_pwd, const char* db_name,
-              int connect_pool_nums, int thread_nums, bool is_open_log, 
-              bool is_async, int block_queue_size);
+    WebServer(
+        int port, int trigger_mode, bool is_linger,
+        int sql_port, const char* sql_user, const char* sql_pwd, const char* db_name,
+        int connect_pool_nums, int thread_pool_nums,
+        bool is_async, int block_queue_size, int timesout
+    );
               
     ~WebServer();
     void Start();
 
 private:
     bool InitSocket(); 
-    void InitEventMode(int triggerMode);
+    void InitEventMode(int trigger_mode);
     void AddClient(int fd, struct sockaddr_in& addr);
   
     void DealListen();
@@ -45,27 +48,20 @@ private:
     static int SetFdNonblock(int fd);
     static const int MAX_FD = 65536;
     
-
-    int port_;
-    bool open_linger_;
-    int timeoutMS_;
-    bool is_close_;
-    int listen_fd_;
-    char* src_dir_;
-    bool is_log_open_;
-    bool is_linger_;
-    
-    uint32_t listen_event_;
-    uint32_t connect_event_;
+    int port_;                                      // 服务器端口号                           
+    int timeoutMS_;                                 // 连接超时时间                              
+    int listen_fd_;                                 // 监听文件描述符
+    bool is_linger_;                                // 套接字优雅关闭标识符
+    bool is_close_;                                 // 服务器关闭标志符
+    uint32_t listen_event_;                         // 设置套接字监听事件类型
+    uint32_t connect_event_;                        // 存储连接套接字发生的事件类型
+    std::filesystem::path src_dir_;                 // 资源目录
    
-    std::unique_ptr<TimerHeap> timer_;
-    std::unique_ptr<ThreadPool> thread_pool_;
-    std::unique_ptr<Epoll> epolls_;
-    std::unordered_map<int, HTTPConnect> users_;
+    std::unique_ptr<TimerHeap> timer_;              // 小顶堆计时器
+    std::unique_ptr<ThreadPool> thread_pool_;       // 线程池
+    std::unique_ptr<Epoll> epolls_;                 // epoll实例
+    std::unordered_map<int, HTTPConnect> users_;    // 用户连接管理
 };
-
-
-
 
 #endif
 
