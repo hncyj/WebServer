@@ -46,7 +46,7 @@ void Log::AsyncWriteLog() {
 }
 
 bool Log::Init(int max_lines, bool is_async, int max_queue_size, int file_expire) {
-    log_file_path_ = std::filesystem::current_path() / "logfiles";
+    log_file_path_ = std::filesystem::path(PROJECT_ROOT) / "logfiles";
     log_file_name_ = "logfile";
     max_lines_ = max_lines;
     is_async_log_ = is_async;
