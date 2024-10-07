@@ -140,4 +140,4 @@ Linux环境下C++实现的轻量级WebServer。
 
 ## 致谢
 
-本项目[素材](/resources/)来自[WebServer](https://github.com/markparticle/WebServer/tree/master).
+本项目[素材](/resources/)来自[markparticle/WebServer](https://github.com/markparticle/WebServer/tree/master).
