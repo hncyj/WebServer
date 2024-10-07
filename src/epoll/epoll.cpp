@@ -17,6 +17,7 @@ Epoll::Epoll(int max_event_nums): epoll_fd_(epoll_create1(0)), events_(max_event
         LOG_ERROR("Epoll: Invalid event vector size.");
         throw std::runtime_error("Epoll: Invalid event vector size.");
     }
+    LOG_INFO("Epoll: init Epoll success.");
 }
 
 Epoll::~Epoll() {
@@ -96,7 +97,7 @@ int Epoll::EpollWait(int timeoutMs) {
     // }
     int nfds = epoll_wait(epoll_fd_, events_.data(), static_cast<int>(events_.size()), timeoutMs);
     if (nfds == -1) {
-        LOG_WARN("Epoll: epoll_wait with nothing, Warning: %d.", errno);
+        LOG_WARN("Epoll: epoll_wait with nothing, errno: %d.", errno);
     }
     return nfds;
 }
