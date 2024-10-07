@@ -10,7 +10,7 @@
 using namespace std;
 
 bool HTTPConnect::is_ET;
-const char* HTTPConnect::src_dir;
+std::filesystem::path HTTPConnect::src_dir;
 std::atomic<int> HTTPConnect::user_cnt;
 
 

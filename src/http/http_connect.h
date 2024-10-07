@@ -47,7 +47,7 @@ public:
     bool IsKeepAlive() const;
 
     static bool is_ET;                                              // 事件触发通知模式
-    static const char* src_dir;                                     // 资源路径
+    static std::filesystem::path src_dir;                           // 资源路径
     static std::atomic<int> user_cnt;                               // 当前连接用户数
 
 private:
