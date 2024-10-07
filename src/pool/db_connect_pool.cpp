@@ -12,10 +12,10 @@ SQLConnectPool* SQLConnectPool::GetSQLConnectPoolInstance() {
     return &sql_connect_pool_instance;
 }
 
-void SQLConnectPool::Init(const char* host, const char* user, const char* password, const char* db_name, int port, int connect_nums) {
+bool SQLConnectPool::Init(const char* host, const char* user, const char* password, const char* db_name, int db_port, int connect_nums) {
     if (connect_nums <= 0) {
         LOG_ERROR("Connect Pool: Init Database connect number error.");
-        throw std::runtime_error("Failed to initialize connection pool.");
+        return false;
     }
 
     int nums = 0;
@@ -26,7 +26,7 @@ void SQLConnectPool::Init(const char* host, const char* user, const char* passwo
             LOG_ERROR("Connect Pool: MySQL connect i: %d init error.", i);
             continue;
         }
-        sql = mysql_real_connect(sql, host, user, password, db_name, port, nullptr, 0);
+        sql = mysql_real_connect(sql, host, user, password, db_name, db_port, nullptr, 0);
         if (!sql) {
             LOG_ERROR("Connect Pool: MySQL i: %d create connect error: %s", i, mysql_error(sql));
             continue;
@@ -37,14 +37,16 @@ void SQLConnectPool::Init(const char* host, const char* user, const char* passwo
     
     if (nums <= 0) {
         LOG_ERROR("Connect Pool: Init Database Connect Pool Failed.");
-        return;
+        return false;
     }
 
     max_connect_nums_ = nums;
     if (sem_init(&sems_, 0, max_connect_nums_) != 0) {
         LOG_ERROR("Connect Pool: Failed to initialize semaphore.");
-        throw std::runtime_error("Connect Pool: Failed to initialize semaphore.");
+        return false;
     }
+
+    return max_connect_nums_ > 0;
 }
 
 MYSQL* SQLConnectPool::GetConnection() {

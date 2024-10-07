@@ -30,7 +30,7 @@ public:
     SQLConnectPool(const SQLConnectPool&) = delete;
     SQLConnectPool& operator=(const SQLConnectPool&) = delete;
     
-    void Init(const char* host, const char* user, const char* password, const char* db_name, int port, int connect_nums = 16);
+    bool Init(const char* host, const char* user, const char* password, const char* db_name, int db_port, int connect_nums = 16);
     MYSQL* GetConnection();                         // 获取空闲连接
     void FreeConnection(MYSQL*);                    // 释放连接
     int GetFreeConnectNums();                       // 获取当前空闲连接数
