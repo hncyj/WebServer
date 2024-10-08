@@ -1,6 +1,6 @@
 # WebServer
 
-Linux环境下C++实现的轻量级WebServer。
+Linux环境下C++实现的轻量级Web服务器。
 
 - [WebServer](#webserver)
   - [环境配置](#环境配置)
@@ -134,10 +134,10 @@ Linux环境下C++实现的轻量级WebServer。
 
 ## 服务器模块
 
-- [WebServer](/src/server/server.h) 类是一个核心模块，用于构建高性能的多线程 HTTP 服务器。
+- [WebServer](/src/server/server.h) 类用于构建高性能的多线程 HTTP 服务器。
 - 它管理套接字连接，处理 HTTP 请求和响应，并通过连接池与 MySQL 数据库交互。
 - 服务器使用 epoll 实现高效的 I/O 多路复用，并支持同步与异步日志记录。
 
 ## 致谢
 
-本项目[素材](/resources/)来自[markparticle/WebServer](https://github.com/markparticle/WebServer/tree/master).
+本项目前端页面[resources](/resources/)来自[markparticle/WebServer](https://github.com/markparticle/WebServer/tree/master).
