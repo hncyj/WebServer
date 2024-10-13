@@ -54,6 +54,8 @@ Linux环境下C++实现的轻量级WebServer。
 
 基于单例模式设计与阻塞队列的同步/异步日志系统。
 
+<img src="/home/chenyinjie/github/WebServer/resources/images/LogSystem.jpg" alt="Logsystem" width="350" height="200" />
+
 **阻塞队列**
 
 - 使用单消费者-多生产者模式的[阻塞队列](src/log/block_queue.h)，将其作为日志异步写入的缓冲区。
