@@ -108,7 +108,7 @@ Linux环境下C++实现的轻量级Web服务器。
 
 ## HTTP模块
 
-该模块共由三部分组成：[HTTP请求报文解析模块](/src/http/http_request.h)、[HTTP响应报文生成模块](/src/http/http_response.h)、[HTTP连接模块](/src/http/http_connect.h)。
+该模块共由三部分组成：[HTTP请求报文解析模块](/src/http/http_request.h)、[HTTP响应报文生成模块](/src/http/http_response.h)、[HTTP连接处理模块](/src/http/http_connect.h)。
 
 **HTTP请求报文解析模块**
 
@@ -137,7 +137,7 @@ Linux环境下C++实现的轻量级Web服务器。
 ## 服务器模块
 
 - [WebServer](/src/server/server.h) 类用于构建高性能的多线程 HTTP 服务器。
-- 它管理套接字连接，处理 HTTP 请求和响应，并通过连接池与 MySQL 数据库交互。
+- 它管理套接字连接，处理 HTTP 请求，并通过连接池与 MySQL 数据库交互。
 - 服务器使用 epoll 实现高效的 I/O 多路复用，并支持同步与异步日志记录。
 
 ## 致谢
